@@ -81,7 +81,7 @@ const values = [
   },
   {
     title: 'Financial Fairness',
-    description: 'We eliminate unfair financial burdens for tenants while securing income for landlords.',
+    description: 'We eliminate unnecessary financial burdens for tenants while securing income for landlords.',
     icon: ScaleIcon,
   },
   {
@@ -126,9 +126,9 @@ const plans = [
     price: 'Free',
     features: [
       '2 properties',
-      'Digital lease generation',
-      'Basic rent collection',
-      'Standard support',
+      'Digital Leasing',
+      'Rent Collection',
+      'Basic Dashboard',
     ],
   },
   {
@@ -136,9 +136,11 @@ const plans = [
     price: '$19/mo',
     features: [
       'Up to 10 properties',
-      'Extended coverage',
-      'Tax support',
-      'Priority support',
+      'All Basic features',
+      'Advance Analytics',
+      'Tax reports',
+      'Legal support',
+      '24/7 Customer support (AI Agent)',
     ],
   },
   {
@@ -146,9 +148,11 @@ const plans = [
     price: 'Custom',
     features: [
       'Unlimited properties',
-      'Legal aid',
-      'API access',
-      'Portfolio management',
+      'Everything in Premium',
+      'Extended coverage',
+      'Custom solutions & services',
+      'Dedicated account manager',
+      'Personalized support',
     ],
   },
 ];
@@ -180,7 +184,17 @@ export default function Company() {
   return (
     <div className="bg-white">
       {/* Hero Section */}
-      <div className="relative isolate overflow-hidden bg-gradient-to-b from-primary-600 to-primary pt-14">
+      <div className="relative isolate overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 pt-14">
+        <div className="absolute inset-0 -z-10 opacity-30">
+          <svg className="absolute inset-0 h-full w-full" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="grid-pattern" width="32" height="32" patternUnits="userSpaceOnUse">
+                <path d="M0 32V0h32v32H0z" fill="none" stroke="currentColor" strokeOpacity="0.1" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid-pattern)" />
+          </svg>
+        </div>
         <div className="mx-auto max-w-7xl px-6 py-20 sm:py-32 lg:flex lg:items-center lg:gap-x-10 lg:px-8 lg:py-40">
           <motion.div 
             className="w-full mx-auto max-w-4xl"
@@ -197,11 +211,11 @@ export default function Company() {
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <Link
                 to="/signup"
-                className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-primary shadow-sm hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                className="rounded-md bg-primary px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
                 Get Started
               </Link>
-              <Link to="/features" className="text-sm font-semibold leading-6 text-white">
+              <Link to="/features" className="text-sm font-semibold leading-6 text-gray-200 hover:text-white">
                 Learn More <span aria-hidden="true">→</span>
               </Link>
             </div>
@@ -236,7 +250,7 @@ export default function Company() {
       </div>
       
       {/* Our Values */}
-      <div className="bg-gray-50 py-24 sm:py-32">
+      <div className="bg-slate-50 py-24 sm:py-32">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <motion.div 
             className="mx-auto max-w-2xl lg:text-center"
@@ -314,7 +328,7 @@ export default function Company() {
       </div>
 
       {/* Our Solution */}
-      <div className="bg-gray-50 py-24 sm:py-32">
+      <div className="bg-slate-50 py-24 sm:py-32">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <motion.div 
             className="mx-auto max-w-2xl lg:text-center"
@@ -421,7 +435,7 @@ export default function Company() {
       </div>
 
       {/* Product Tiers */}
-      <div className="bg-gray-50 py-24 sm:py-32">
+      <div className="bg-slate-50 py-24 sm:py-32">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <motion.div 
             className="mx-auto max-w-2xl lg:text-center"
@@ -491,7 +505,7 @@ export default function Company() {
           <div className="mx-auto mt-16 max-w-6xl">
             <div className="relative">
               {/* Flow Diagram */}
-              <div className="hidden lg:block absolute top-1/2 left-0 right-0 h-1 bg-primary/30 -translate-y-1/2 z-0"></div>
+              <div className="hidden lg:block absolute top-1/2 left-0 right-0 h-1 bg-slate-300 -translate-y-1/2 z-0"></div>
               <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
                 {steps.map((step, index) => (
                   <motion.div
@@ -522,15 +536,16 @@ export default function Company() {
       </div>
 
       {/* Partners Section */}
-      <div className="bg-gray-50 py-20">
+      <div className="bg-slate-50 py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <Partners />
         </div>
       </div>
 
       {/* Join the Movement CTA */}
-      <div className="bg-primary">
-        <div className="mx-auto max-w-7xl py-16 px-6 sm:py-24 lg:px-8">
+      <div className="relative bg-gradient-to-r from-slate-800 to-primary-800 overflow-hidden">
+        <div className="absolute inset-0 bg-grid-white/[0.05] bg-[length:16px_16px]"></div>
+        <div className="mx-auto max-w-7xl py-16 px-6 sm:py-24 lg:px-8 relative z-10">
           <motion.div 
             className="text-center"
             initial={{ opacity: 0, y: 20 }}
@@ -543,19 +558,19 @@ export default function Company() {
             <div className="mt-10 flex flex-wrap justify-center gap-6">
               <Link
                 to="/partners"
-                className="rounded-md bg-white px-5 py-3 text-md font-semibold text-primary shadow-sm hover:bg-gray-100"
+                className="rounded-md bg-white px-5 py-3 text-md font-semibold text-slate-800 shadow-sm hover:bg-gray-100"
               >
                 Become a Partner
               </Link>
               <Link
                 to="/signup"
-                className="rounded-md bg-primary-600 px-5 py-3 text-md font-semibold text-white shadow-sm hover:bg-primary-700 border border-white"
+                className="rounded-md bg-primary px-5 py-3 text-md font-semibold text-white shadow-sm hover:bg-primary-600 border border-white"
               >
                 Try Reenter
               </Link>
               <Link
                 to="/contact"
-                className="rounded-md bg-transparent px-5 py-3 text-md font-semibold text-white shadow-sm hover:bg-primary-700 border border-white"
+                className="rounded-md bg-transparent px-5 py-3 text-md font-semibold text-white shadow-sm hover:bg-slate-700/50 border border-white"
               >
                 Request Pitch Deck
               </Link>
