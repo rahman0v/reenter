@@ -10,10 +10,12 @@ import Contact from './components/Contact';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Company from './pages/Company';
+import ScrollToTop from './components/ScrollToTop';
 
 export default function App() {
   return (
     <Router>
+      <ScrollToTop />
       <div className="min-h-screen bg-white">
         <Header />
         <main>
