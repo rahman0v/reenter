@@ -24,7 +24,7 @@ const steps = [
   },
   {
     name: 'Replace Deposit with Monthly Premium',
-    description: 'Tenant pays small monthly premium instead of large upfront deposit. Coverage includes up to 3 months unpaid rent and limited property damage.',
+    description: 'Tenant pays small monthly premium instead of large upfront deposit. Coverage includes up to 3 months unpaid rent and property damage as defined in our policy.',
     href: '/features#deposit-replacement',
     icon: (
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">

@@ -9,6 +9,7 @@ import Partners from './components/Partners';
 import Contact from './components/Contact';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import Company from './pages/Company';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <main>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/company" element={<Company />} />
             <Route path="/features" element={<Features />} />
             <Route path="/plans" element={<Plans />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
