@@ -557,7 +557,7 @@ export default function Company() {
             </h2>
             <div className="mt-10 flex flex-wrap justify-center gap-6">
               <Link
-                to="/partners"
+                to="/contact"
                 className="rounded-md bg-white px-5 py-3 text-md font-semibold text-slate-800 shadow-sm hover:bg-gray-100"
               >
                 Become a Partner
