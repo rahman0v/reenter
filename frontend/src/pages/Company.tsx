@@ -543,7 +543,7 @@ export default function Company() {
       </div>
 
       {/* Join the Movement CTA */}
-      <div className="relative bg-gradient-to-r from-slate-800 to-primary-800 overflow-hidden">
+      <div className="relative bg-gradient-to-r from-slate-800 to-primary-800 overflow-hidden mb-16">
         <div className="absolute inset-0 bg-grid-white/[0.05] bg-[length:16px_16px]"></div>
         <div className="mx-auto max-w-7xl py-16 px-6 sm:py-24 lg:px-8 relative z-10">
           <motion.div 
