@@ -480,7 +480,7 @@ export default function Company() {
                       ? 'bg-primary text-white shadow-sm hover:bg-primary-600 focus-visible:outline-primary' 
                       : 'bg-gray-50 text-primary hover:bg-gray-100'}`}
                 >
-                  {plan.name === 'Enterprise' ? 'Contact Sales' : 'Get Started'}
+                  {plan.name === 'Enterprise' ? 'Contact Sales' : plan.name === 'Premium' ? 'Start Free Trial' : 'Get Started'}
                 </Link>
               </motion.div>
             ))}
