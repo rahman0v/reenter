@@ -32,7 +32,13 @@ router.put(
       check('name', 'Name is required').optional(),
       check('phone', 'Phone is required').optional(),
       check('bio', 'Bio is optional').optional(),
-      check('photo_url', 'Photo URL is optional').optional()
+      check('photo_url', 'Photo URL is optional').optional(),
+      check('preferred_name', 'Preferred name is optional').optional(),
+      check('address', 'Address is optional').optional(),
+      check('emergency_contact', 'Emergency contact is optional').optional(),
+      check('education_status', 'Education status is optional').optional(),
+      check('employment_status', 'Employment status is optional').optional(),
+      check('date_of_birth', 'Date of birth is optional').optional()
     ]
   ],
   async (req, res) => {
@@ -41,14 +47,23 @@ router.put(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, phone, bio, photo_url } = req.body;
+    const { 
+      name, phone, bio, photo_url, preferred_name, address, 
+      emergency_contact, education_status, employment_status, date_of_birth 
+    } = req.body;
 
     try {
       const updatedUser = await User.updateProfile(req.user.id, {
         name,
         phone,
         bio,
-        photo_url
+        photo_url,
+        preferred_name,
+        address,
+        emergency_contact,
+        education_status,
+        employment_status,
+        date_of_birth
       });
       res.json(updatedUser);
     } catch (err) {

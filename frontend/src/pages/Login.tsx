@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LockClosedIcon, ShieldCheckIcon } from '@heroicons/react/24/solid';
+import { LockClosedIcon, ShieldCheckIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
+import { authService } from '../services/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formTouched, setFormTouched] = useState({
     email: false,
     password: false
@@ -45,16 +47,82 @@ export default function Login() {
       setError('');
       setIsLoading(true);
       
-      const success = await login({ email, password });
+      // Log the attempt with credentials (but not password)
+      console.log('Login attempt:', { email, timestamp: new Date().toISOString() });
       
-      if (success) {
-        navigate('/dashboard');
-      } else {
-        setError('Failed to login. Please check your credentials.');
+      // Try a direct fetch call to test connectivity
+      try {
+        console.log('Attempting direct fetch to http://localhost:5000/api/auth/login...');
+        const testResponse = await fetch('http://localhost:5000/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, password }),
+        });
+        
+        console.log('Raw fetch response:', { 
+          status: testResponse.status, 
+          statusText: testResponse.statusText,
+          headers: Object.fromEntries([...testResponse.headers])
+        });
+        
+        if (!testResponse.ok) {
+          let errorText = '';
+          try {
+            errorText = await testResponse.text();
+          } catch (readError) {
+            errorText = 'Could not read error response';
+          }
+          console.error('Fetch error response:', errorText);
+          throw new Error(`Server responded with ${testResponse.status}: ${errorText}`);
+        }
+        
+        let data;
+        try {
+          data = await testResponse.json();
+          console.log('Fetch login successful, creating user object');
+          
+          // Create a user object from the token data
+          // Since we don't have user details from regular login, we'll create minimal data
+          const user = {
+            id: 0, // We don't know the ID
+            email: email,
+            name: email.split('@')[0], // Use part of email as display name
+            role: 'user',
+            is_active: true,
+            created_at: new Date().toISOString(),
+            verifications: {
+              email: true,
+              phone: false,
+              identity: false
+            },
+            bio: '',
+            photo_url: '',
+            phone: '',
+            updated_at: ''
+          };
+          
+          // Use context login to update global auth state
+          login(data.token, user);
+          
+          console.log('Login successful, redirecting');
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 100);
+          
+          return;
+        } catch (jsonError) {
+          console.error('Error parsing JSON response:', jsonError);
+          throw new Error('Invalid JSON response from server');
+        }
+      } catch (fetchError: any) {
+        console.error('Direct fetch login failed:', fetchError);
+        setError(fetchError.message || 'Login failed. Please try again.');
       }
-    } catch (err) {
-      setError('An error occurred during login. Please try again.');
-      console.error(err);
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.response?.data?.message || err.message || 'An error occurred during login. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -129,7 +197,7 @@ export default function Login() {
                 <input
                   id="password"
                   name="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   required
                   value={password}
@@ -141,7 +209,17 @@ export default function Login() {
                   placeholder="••••••••"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                  <LockClosedIcon className="h-5 w-5 text-gray-400" />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-gray-400 hover:text-gray-500 focus:outline-none"
+                  >
+                    {showPassword ? (
+                      <EyeSlashIcon className="h-5 w-5" />
+                    ) : (
+                      <EyeIcon className="h-5 w-5" />
+                    )}
+                  </button>
                 </div>
               </div>
               {formTouched.password && !password && (

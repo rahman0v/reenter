@@ -277,48 +277,48 @@ const LeaseCard = ({ lease, userRole }: { lease: Lease; userRole: 'landlord' | '
                         Lease Details
                       </Dialog.Title>
                       <div className="mt-4 text-left">
-                        <div className="grid grid-cols-1 gap-4">
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">Property Name</p>
-                            <p className="mt-1 text-sm text-gray-900">{lease.property_name}</p>
+                        <div className="grid grid-cols-1 gap-3">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-500">Property Name:</span>
+                            <span className="text-sm text-gray-900">{lease.property_name}</span>
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">Property Address</p>
-                            <p className="mt-1 text-sm text-gray-900">{lease.property_address}</p>
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-500">Property Address:</span>
+                            <span className="text-sm text-gray-900">{lease.property_address}</span>
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">Status</p>
-                            <p className="mt-1 text-sm text-gray-900">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-500">Status:</span>
+                            <span className="text-sm text-gray-900">
                               {lease.status.charAt(0).toUpperCase() + lease.status.slice(1)}
-                            </p>
+                            </span>
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">Reference Code</p>
-                            <p className="mt-1 text-sm text-gray-900">{lease.ref_code}</p>
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-500">Reference Code:</span>
+                            <span className="text-sm text-gray-900">{lease.ref_code}</span>
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">Start Date</p>
-                            <p className="mt-1 text-sm text-gray-900">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-500">Start Date:</span>
+                            <span className="text-sm text-gray-900">
                               {new Date(lease.start_date).toLocaleDateString()}
-                            </p>
+                            </span>
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">End Date</p>
-                            <p className="mt-1 text-sm text-gray-900">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-500">End Date:</span>
+                            <span className="text-sm text-gray-900">
                               {new Date(lease.end_date).toLocaleDateString()}
-                            </p>
+                            </span>
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">Monthly Rent</p>
-                            <p className="mt-1 text-sm text-gray-900">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-500">Monthly Rent:</span>
+                            <span className="text-sm text-gray-900">
                               {formatNumber(monthlyRent)} {lease.currency}
-                            </p>
+                            </span>
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">{userRole === 'landlord' ? 'Tenant' : 'Landlord'}</p>
-                            <p className="mt-1 text-sm text-gray-900">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-500">{userRole === 'landlord' ? 'Tenant:' : 'Landlord:'}</span>
+                            <span className="text-sm text-gray-900">
                               {userRole === 'landlord' ? lease.tenant_name || 'No tenant assigned' : lease.landlord_name || 'Unknown'}
-                            </p>
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -352,6 +352,8 @@ export default function Leases() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [leases, setLeases] = useState<Lease[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Modals
@@ -391,13 +393,24 @@ export default function Leases() {
     e.preventDefault();
     try {
       setError(null);
+      setIsCreating(true);
+      
+      // Validate dates
+      const startDate = new Date(newLeaseForm.start_date);
+      const endDate = new Date(newLeaseForm.end_date);
+      
+      if (endDate <= startDate) {
+        setError('End date must be after start date');
+        setIsCreating(false);
+        return;
+      }
       
       // Ensure dates are in ISO8601 format and monthly_rent is a number
       const formattedData = {
         ...newLeaseForm,
         monthly_rent: Number(newLeaseForm.monthly_rent),
-        start_date: new Date(newLeaseForm.start_date).toISOString().split('T')[0],
-        end_date: new Date(newLeaseForm.end_date).toISOString().split('T')[0]
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0]
       };
       
       console.log('Submitting lease data:', formattedData);
@@ -417,9 +430,13 @@ export default function Leases() {
       if (err.response && err.response.data && err.response.data.errors) {
         const errorMessages = err.response.data.errors.map((e: any) => e.msg).join(', ');
         setError(`Failed to create lease: ${errorMessages}`);
+      } else if (err.response && err.response.data && err.response.data.message) {
+        setError(`Failed to create lease: ${err.response.data.message}`);
       } else {
         setError('Failed to create lease. Please try again.');
       }
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -427,13 +444,27 @@ export default function Leases() {
     e.preventDefault();
     try {
       setError(null);
+      setIsJoining(true);
+      
+      if (!joinLeaseForm.ref_code.trim()) {
+        setError('Please enter a valid reference code');
+        setIsJoining(false);
+        return;
+      }
+      
       const joinedLease = await leaseService.joinLease(joinLeaseForm.ref_code);
       setLeases(prev => [joinedLease, ...prev]);
       setShowJoinLeaseModal(false);
       setJoinLeaseForm({ ref_code: '' });
-    } catch (err) {
-      setError('Failed to join lease. Please check the reference code and try again.');
+    } catch (err: any) {
       console.error('Error joining lease:', err);
+      if (err.response && err.response.data && err.response.data.message) {
+        setError(`Failed to join lease: ${err.response.data.message}`);
+      } else {
+        setError('Failed to join lease. Please check the reference code and try again.');
+      }
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -758,14 +789,26 @@ export default function Leases() {
                       <div className="mt-8 sm:flex sm:flex-row-reverse">
                         <button
                           type="submit"
-                          className="inline-flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                          disabled={isCreating}
+                          className="inline-flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Create Lease
+                          {isCreating ? (
+                            <>
+                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Creating...
+                            </>
+                          ) : (
+                            'Create Lease'
+                          )}
                         </button>
                         <button
                           type="button"
                           onClick={() => setShowNewLeaseModal(false)}
-                          className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:text-sm"
+                          disabled={isCreating}
+                          className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Cancel
                         </button>
@@ -828,14 +871,26 @@ export default function Leases() {
                       <div className="mt-6 sm:mt-8 sm:flex sm:flex-row-reverse">
                         <button
                           type="submit"
-                          className="inline-flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                          disabled={isJoining}
+                          className="inline-flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Join Lease
+                          {isJoining ? (
+                            <>
+                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Joining...
+                            </>
+                          ) : (
+                            'Join Lease'
+                          )}
                         </button>
                         <button
                           type="button"
                           onClick={() => setShowJoinLeaseModal(false)}
-                          className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:text-sm"
+                          disabled={isJoining}
+                          className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Cancel
                         </button>

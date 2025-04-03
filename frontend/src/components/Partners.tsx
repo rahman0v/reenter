@@ -65,8 +65,12 @@ export default function Partners() {
   const controls = useAnimation();
 
   useEffect(() => {
+    let isMounted = true;
+    
     const animate = async () => {
-      while (true) {
+      if (!isMounted) return;
+      
+      try {
         await controls.start({
           x: [-2400, 0],
           transition: {
@@ -75,9 +79,21 @@ export default function Partners() {
             repeat: Infinity,
           },
         });
+      } catch (err) {
+        console.error("Animation error:", err);
       }
     };
-    animate();
+    
+    // Slight delay to ensure component is fully mounted
+    const timer = setTimeout(() => {
+      animate();
+    }, 100);
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+      controls.stop();
+    };
   }, [controls]);
 
   return (
