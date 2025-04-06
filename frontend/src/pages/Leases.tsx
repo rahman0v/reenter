@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { leaseService } from '../services/api';
 import { Dialog, Transition } from '@headlessui/react';
@@ -19,12 +19,14 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ExclamationTriangleIcon,
+  ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
+import { useNavigate } from 'react-router-dom';
+import Modal from '../components/Modal';
+import { LeaseData, LeaseStatus, Currency } from '../services/api';
 
 // Types and Interfaces
-type LeaseStatus = 'pending' | 'active' | 'expiring' | 'completed' | 'cancelled';
 type UserRole = 'all' | 'landlord' | 'tenant';
-type Currency = 'USD' | 'EUR' | 'TRY';
 
 interface NewLeaseForm {
   property_name: string;
@@ -33,10 +35,26 @@ interface NewLeaseForm {
   currency: Currency;
   start_date: string;
   end_date: string;
+  template_data?: {
+    additional_terms?: string;
+    utilities_included?: string[];
+    pets_allowed?: boolean;
+    smoking_allowed?: boolean;
+    notice_period_days?: number;
+    [key: string]: any;
+  };
 }
 
 interface JoinLeaseForm {
-  ref_code: string;
+  lease_id: string;
+  template_data: {
+    additional_terms: string;
+    utilities_included: string[];
+    pets_allowed: boolean;
+    smoking_allowed: boolean;
+    notice_period_days: number;
+    [key: string]: any;
+  };
 }
 
 interface Property {
@@ -103,239 +121,312 @@ const CURRENCY_NAMES: Record<Currency, string> = {
 
 // Helper Components
 const StatusBadge = ({ status }: { status: LeaseStatus }) => {
-  const statusStyles = {
-    pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    active: 'bg-green-100 text-green-800 border-green-200',
-    expiring: 'bg-orange-100 text-orange-800 border-orange-200',
-    completed: 'bg-gray-100 text-gray-800 border-gray-200',
-    cancelled: 'bg-red-100 text-red-800 border-red-200',
-  };
+  let color;
+  let bgColor;
+  let label;
+
+  switch (status) {
+    case 'draft':
+      bgColor = 'bg-gray-100';
+      color = 'text-gray-800';
+      label = 'Draft';
+      break;
+    case 'pending':
+      bgColor = 'bg-blue-100';
+      color = 'text-blue-800';
+      label = 'Pending Review';
+      break;
+    case 'awaiting_landlord_signature':
+      bgColor = 'bg-purple-100';
+      color = 'text-purple-800';
+      label = 'Awaiting Landlord';
+      break;
+    case 'awaiting_tenant_signature':
+      bgColor = 'bg-indigo-100';
+      color = 'text-indigo-800';
+      label = 'Awaiting Tenant';
+      break;
+    case 'changes_requested':
+      bgColor = 'bg-yellow-100';
+      color = 'text-yellow-800';
+      label = 'Changes Requested';
+      break;
+    case 'active':
+      bgColor = 'bg-green-100';
+      color = 'text-green-800';
+      label = 'Active';
+      break;
+    case 'completed':
+      bgColor = 'bg-teal-100';
+      color = 'text-teal-800';
+      label = 'Completed';
+      break;
+    case 'terminated':
+      bgColor = 'bg-red-100';
+      color = 'text-red-800';
+      label = 'Terminated';
+      break;
+    case 'cancelled':
+      bgColor = 'bg-gray-100';
+      color = 'text-gray-800';
+      label = 'Cancelled';
+      break;
+    default:
+      bgColor = 'bg-gray-100';
+      color = 'text-gray-800';
+      label = status;
+  }
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusStyles[status]}`}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${bgColor} ${color} shadow-sm`}>
+      {label}
     </span>
   );
 };
 
-const EmptyState = ({ role, onAction }: { role: UserRole; onAction: () => void }) => (
-  <div className="text-center py-12">
-    <BuildingOfficeIcon className="mx-auto h-12 w-12 text-gray-400" />
-    <h3 className="mt-2 text-sm font-medium text-gray-900">No {role === 'all' ? '' : role} leases</h3>
-    <p className="mt-1 text-sm text-gray-500">
-      {role === 'landlord'
-        ? "You haven't created any leases yet."
-        : role === 'tenant'
-        ? "You haven't joined any leases yet."
-        : "You haven't created or joined any leases yet."}
-    </p>
-    {role !== 'all' && (
-      <div className="mt-6">
-        <button
-          onClick={onAction}
-          className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-        >
-          <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-          {role === 'landlord' ? 'Create New Lease' : 'Join Existing Lease'}
-        </button>
-      </div>
-    )}
-  </div>
-);
-
-const LeaseCard = ({ lease, userRole }: { lease: Lease; userRole: 'landlord' | 'tenant' }) => {
-  const [showDetails, setShowDetails] = useState(false);
-
-  const TAX_RATE = 0.21; // 21% tax rate
-  const COMMISSION_RATE = 0.085; // 8.5% commission rate
-  
-  // For tenant view - ensure we're using integers for the calculations
-  const monthlyRent = Math.round(lease.monthly_rent); // Ensure the base rent is rounded
-  const commissionAmount = Math.round(monthlyRent * COMMISSION_RATE);
-  const totalWithCommission = monthlyRent + commissionAmount;
-  
-  // For landlord view
-  const taxAmount = Math.round(monthlyRent * TAX_RATE);
-  const netIncome = monthlyRent - taxAmount;
-
-  // Format number without decimals
-  const formatNumber = (num: number) => Math.round(num).toLocaleString();
-
+const EmptyState = ({ role, onAction }: { role: UserRole, onAction: () => void }) => {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow duration-200">
-      <div className="p-6">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">{lease.property_name}</h3>
-            <p className="mt-1 text-sm text-gray-500">{lease.property_address}</p>
-          </div>
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-            lease.status === 'active' ? 'bg-green-50 text-green-700' :
-            lease.status === 'pending' ? 'bg-yellow-50 text-yellow-700' :
-            lease.status === 'expiring' ? 'bg-orange-50 text-orange-700' :
-            lease.status === 'completed' ? 'bg-blue-50 text-blue-700' :
-            'bg-red-50 text-red-700'
-          }`}>
-            {lease.status.charAt(0).toUpperCase() + lease.status.slice(1)}
-          </span>
+    <div className="text-center bg-white shadow-sm rounded-lg border border-gray-200 px-6 py-12">
+      <BuildingOfficeIcon className="mx-auto h-12 w-12 text-gray-400" />
+      <h3 className="mt-2 text-lg font-medium text-gray-900">No leases found</h3>
+      <p className="mt-1 text-sm text-gray-500">
+        {role === 'all'
+          ? "You don't have any leases yet."
+          : role === 'landlord'
+          ? "You haven't created any leases as a landlord yet."
+          : "You don't have any active leases as a tenant."}
+      </p>
+      {role !== 'all' && (
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={onAction}
+            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+            {role === 'tenant' ? 'Join a Lease' : 'New Lease'}
+          </button>
         </div>
+      )}
+    </div>
+  );
+};
 
-        <div className="grid grid-cols-1 gap-3">
-          <div className="flex justify-between">
-            <span className="text-sm font-medium text-gray-500">Reference Code:</span>
-            <span className="text-sm text-gray-900">{lease.ref_code}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm font-medium text-gray-500">{userRole === 'landlord' ? 'Tenant:' : 'Landlord:'}</span>
-            <span className="text-sm text-gray-900">{userRole === 'landlord' ? lease.tenant_name || 'No tenant assigned' : lease.landlord_name || 'Unknown'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm font-medium text-gray-500">Duration:</span>
-            <span className="text-sm text-gray-900">
-              {new Date(lease.start_date).toLocaleDateString()} - {new Date(lease.end_date).toLocaleDateString()}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm font-medium text-gray-500">Monthly Rent:</span>
-            <span className="text-sm text-gray-900">
-              {formatNumber(monthlyRent)} {lease.currency}
-            </span>
-          </div>
-          {userRole === 'tenant' ? (
-            <>
-              <div className="flex justify-between">
-                <span className="text-sm font-medium text-gray-500">Commission (8.5%):</span>
-                <span className="text-sm text-gray-900">
-                  {formatNumber(commissionAmount)} {lease.currency}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm font-medium text-gray-500">Total Amount:</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {formatNumber(totalWithCommission)} {lease.currency}
-                </span>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex justify-between">
-                <span className="text-sm font-medium text-gray-500">Taxable (21%):</span>
-                <span className="text-sm text-gray-900">
-                  {formatNumber(taxAmount)} {lease.currency}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm font-medium text-gray-500">Net Income:</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {formatNumber(netIncome)} {lease.currency}
-                </span>
-              </div>
-            </>
-          )}
+interface LeaseCardProps {
+  lease: Lease;
+  userRole: 'landlord' | 'tenant';
+}
+
+const LeaseCard = ({ lease, userRole }: LeaseCardProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [viewDetailId, setViewDetailId] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  
+  const formatCurrency = (amount: number, currency: Currency) => {
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+    return formatter.format(amount);
+  };
+  
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+  
+  const viewDetails = () => {
+    // Navigate to the lease detail page with the ID
+    navigate(`/leases/${lease.id}`);
+  };
+  
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+  
+  const handleDeleteConfirm = async () => {
+    try {
+      setIsDeleting(true);
+      setDeleteError('');
+      
+      const result = await leaseService.deleteLease(lease.ref_code);
+      
+      // Show success message before refreshing
+      alert(`Lease successfully deleted: ${lease.property_name}`);
+      
+      // Refresh the page to show updated leases list
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Failed to delete lease:', error);
+      setDeleteError(
+        error.response?.data?.msg || 
+        error.response?.data?.message || 
+        'Failed to delete lease. Please try again.'
+      );
+      setShowDeleteConfirm(false); // Close the modal to show the error
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+  
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+  };
+  
+  // Check if the current user is the landlord who created this lease
+  const isCreator = currentUser?.id === lease.landlord_id;
+  
+  return (
+    <div className="bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200">
+      {/* Card Header with Property Name and Status Badge */}
+      <div className="p-5">
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="text-lg font-medium text-gray-900 flex items-center truncate">
+            <BuildingOfficeIcon className="h-5 w-5 text-gray-500 mr-2 flex-shrink-0" />
+            <span className="truncate">{lease.property_name}</span>
+          </h3>
+          <StatusBadge status={lease.status} />
+        </div>
+        <p className="text-sm text-gray-500 mb-3">{lease.property_address}</p>
+        
+        {/* Reference Code - Small and subtle */}
+        <div className="mb-4">
+          <span className="text-xs text-gray-400">{lease.ref_code}</span>
         </div>
         
-        <div className="mt-6 flex justify-end">
+        {/* Key Information Section */}
+        <div className="space-y-3 mb-5">
+          {/* Lease Period */}
+          <div className="flex items-center text-sm">
+            <CalendarIcon className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+            <span className="text-gray-600">{formatDate(lease.start_date)} - {formatDate(lease.end_date)}</span>
+          </div>
+          
+          {/* Person Info (Tenant or Landlord) */}
+          <div className="flex items-center text-sm">
+            <UserIcon className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+            <span className="text-gray-600">
+              {userRole === 'landlord' 
+                ? <>Tenant: <span className="font-medium">{lease.tenant_name || 'No tenant yet'}</span></>
+                : <>Landlord: <span className="font-medium">{lease.landlord_name}</span></>
+              }
+            </span>
+          </div>
+          
+          {/* Rent Amount */}
+          <div className="flex items-center text-sm">
+            <BanknotesIcon className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+            <span className="font-medium text-gray-800">
+              {formatCurrency(lease.monthly_rent, lease.currency)}/month
+            </span>
+          </div>
+        </div>
+        
+        {/* Action Buttons */}
+        <div className="flex justify-end space-x-3 mt-4">
+          {/* Only show delete button if user is the creator (landlord) and we're in the landlord section */}
+          {isCreator && userRole === 'landlord' && (
+            <button
+              type="button"
+              onClick={handleDeleteClick}
+              disabled={isDeleting}
+              className="inline-flex items-center px-3 py-1.5 border border-red-300 shadow-sm text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </button>
+          )}
           <button
-            onClick={() => setShowDetails(true)}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+            type="button"
+            onClick={viewDetails}
+            className="inline-flex items-center px-4 py-1.5 border border-transparent shadow-sm text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             View Details
           </button>
         </div>
       </div>
+      
+      {deleteError && (
+        <div className="px-4 py-2 bg-red-50 text-sm text-red-700 border-t border-red-200">
+          {deleteError}
+        </div>
+      )}
+      
+      {/* Delete Confirmation Modal */}
+      <Transition.Root show={showDeleteConfirm} as={Fragment}>
+        <Dialog as="div" className="fixed z-10 inset-0 overflow-y-auto" onClose={handleDeleteCancel}>
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0"
+              enterTo="opacity-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100"
+              leaveTo="opacity-0"
+            >
+              <Dialog.Overlay className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+            </Transition.Child>
 
-      {/* Details Modal */}
-      <Transition.Root show={showDetails} as={Fragment}>
-        <Dialog as="div" className="relative z-10" onClose={setShowDetails}>
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 z-10 overflow-y-auto">
-            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-              <Transition.Child
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                enterTo="opacity-100 translate-y-0 sm:scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 translate-y-0 sm:scale-100"
-                leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-              >
-                <Dialog.Panel className="relative transform overflow-hidden rounded-xl bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
-                  <div>
-                    <div className="mt-3 text-center sm:mt-5">
-                      <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900">
-                        Lease Details
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">
+              &#8203;
+            </span>
+            
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+              enterTo="opacity-100 translate-y-0 sm:scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+              leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            >
+              <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <ExclamationTriangleIcon className="h-6 w-6 text-red-600" aria-hidden="true" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <Dialog.Title as="h3" className="text-lg leading-6 font-medium text-gray-900">
+                        Delete Lease
                       </Dialog.Title>
-                      <div className="mt-4 text-left">
-                        <div className="grid grid-cols-1 gap-3">
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium text-gray-500">Property Name:</span>
-                            <span className="text-sm text-gray-900">{lease.property_name}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium text-gray-500">Property Address:</span>
-                            <span className="text-sm text-gray-900">{lease.property_address}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium text-gray-500">Status:</span>
-                            <span className="text-sm text-gray-900">
-                              {lease.status.charAt(0).toUpperCase() + lease.status.slice(1)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium text-gray-500">Reference Code:</span>
-                            <span className="text-sm text-gray-900">{lease.ref_code}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium text-gray-500">Start Date:</span>
-                            <span className="text-sm text-gray-900">
-                              {new Date(lease.start_date).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium text-gray-500">End Date:</span>
-                            <span className="text-sm text-gray-900">
-                              {new Date(lease.end_date).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium text-gray-500">Monthly Rent:</span>
-                            <span className="text-sm text-gray-900">
-                              {formatNumber(monthlyRent)} {lease.currency}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium text-gray-500">{userRole === 'landlord' ? 'Tenant:' : 'Landlord:'}</span>
-                            <span className="text-sm text-gray-900">
-                              {userRole === 'landlord' ? lease.tenant_name || 'No tenant assigned' : lease.landlord_name || 'Unknown'}
-                            </span>
-                          </div>
-                        </div>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          Are you sure you want to delete this lease? This action cannot be undone.
+                        </p>
                       </div>
                     </div>
                   </div>
-                  <div className="mt-5 sm:mt-6">
-                    <button
-                      type="button"
-                      className="inline-flex w-full justify-center rounded-lg border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-sm transition-colors duration-200"
-                      onClick={() => setShowDetails(false)}
-                    >
-                      Close
-                    </button>
-                  </div>
-                </Dialog.Panel>
-              </Transition.Child>
-            </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                    onClick={handleDeleteConfirm}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    onClick={handleDeleteCancel}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </Transition.Child>
           </div>
         </Dialog>
       </Transition.Root>
@@ -343,10 +434,61 @@ const LeaseCard = ({ lease, userRole }: { lease: Lease; userRole: 'landlord' | '
   );
 };
 
-// Main Component
-export default function Leases() {
+// Tabs component
+const LeaseTabs = ({ activeTab, setActiveTab, leaseCount }: { activeTab: UserRole, setActiveTab: (tab: UserRole) => void, leaseCount: { all: number, landlord: number, tenant: number } }) => {
+  return (
+    <div className="flex justify-start mb-6">
+      <div className="inline-flex bg-blue-50 rounded-full p-1">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`flex items-center px-4 py-2 rounded-full text-sm ${
+            activeTab === 'all'
+              ? 'bg-blue-600 text-white font-medium'
+              : 'text-gray-700 hover:text-gray-900'
+          }`}
+        >
+          All Leases
+          <span className={`ml-2 py-0.5 px-2 text-xs rounded-full ${activeTab === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
+            {leaseCount.all}
+          </span>
+        </button>
+        
+        <button
+          onClick={() => setActiveTab('landlord')}
+          className={`flex items-center px-4 py-2 rounded-full text-sm ${
+            activeTab === 'landlord'
+              ? 'bg-blue-600 text-white font-medium'
+              : 'text-gray-700 hover:text-gray-900'
+          }`}
+        >
+          As Landlord
+          <span className={`ml-2 py-0.5 px-2 text-xs rounded-full ${activeTab === 'landlord' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
+            {leaseCount.landlord}
+          </span>
+        </button>
+        
+        <button
+          onClick={() => setActiveTab('tenant')}
+          className={`flex items-center px-4 py-2 rounded-full text-sm ${
+            activeTab === 'tenant'
+              ? 'bg-blue-600 text-white font-medium'
+              : 'text-gray-700 hover:text-gray-900'
+          }`}
+        >
+          As Tenant
+          <span className={`ml-2 py-0.5 px-2 text-xs rounded-full ${activeTab === 'tenant' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
+            {leaseCount.tenant}
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Main Leases page component
+const Leases = () => {
   const { currentUser } = useAuth();
-  const [activeRole, setActiveRole] = useState<UserRole>('all');
+  const [activeTab, setActiveTab] = useState<UserRole>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<LeaseStatus | 'all'>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -355,6 +497,8 @@ export default function Leases() {
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [leaseCount, setLeaseCount] = useState({ all: 0, landlord: 0, tenant: 0 });
+  const navigate = useNavigate();
 
   // Modals
   const [showNewLeaseModal, setShowNewLeaseModal] = useState(false);
@@ -366,10 +510,25 @@ export default function Leases() {
     currency: 'USD',
     start_date: '',
     end_date: '',
+    template_data: {
+      additional_terms: '',
+      utilities_included: [],
+      pets_allowed: false,
+      smoking_allowed: false,
+      notice_period_days: 30
+    }
   });
   const [joinLeaseForm, setJoinLeaseForm] = useState<JoinLeaseForm>({
-    ref_code: '',
+    lease_id: '',
+    template_data: {
+      additional_terms: '',
+      utilities_included: [],
+      pets_allowed: false,
+      smoking_allowed: false,
+      notice_period_days: 30
+    }
   });
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLeases();
@@ -381,6 +540,11 @@ export default function Leases() {
       setError(null);
       const data = await leaseService.getAllLeases();
       setLeases(data);
+      setLeaseCount({
+        all: data.length,
+        landlord: data.filter(lease => lease.landlord_id === currentUser?.id).length,
+        tenant: data.filter(lease => lease.tenant_id === currentUser?.id).length,
+      });
     } catch (err) {
       setError('Failed to fetch leases. Please try again.');
       console.error('Error fetching leases:', err);
@@ -406,11 +570,18 @@ export default function Leases() {
       }
       
       // Ensure dates are in ISO8601 format and monthly_rent is a number
-      const formattedData = {
+      const formattedData: LeaseData = {
         ...newLeaseForm,
         monthly_rent: Number(newLeaseForm.monthly_rent),
         start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0]
+        end_date: endDate.toISOString().split('T')[0],
+        template_data: newLeaseForm.template_data || {
+          additional_terms: '',
+          utilities_included: [],
+          pets_allowed: false,
+          smoking_allowed: false,
+          notice_period_days: 30
+        }
       };
       
       console.log('Submitting lease data:', formattedData);
@@ -424,6 +595,13 @@ export default function Leases() {
         currency: 'USD',
         start_date: '',
         end_date: '',
+        template_data: {
+          additional_terms: '',
+          utilities_included: [],
+          pets_allowed: false,
+          smoking_allowed: false,
+          notice_period_days: 30
+        }
       });
     } catch (err: any) {
       console.error('Error creating lease:', err);
@@ -443,25 +621,42 @@ export default function Leases() {
   const handleJoinLease = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      setError(null);
+      setJoinError(null);
       setIsJoining(true);
       
-      if (!joinLeaseForm.ref_code.trim()) {
-        setError('Please enter a valid reference code');
+      if (!joinLeaseForm.lease_id.trim()) {
+        setJoinError('Please enter a valid lease ID');
         setIsJoining(false);
         return;
       }
       
-      const joinedLease = await leaseService.joinLease(joinLeaseForm.ref_code);
+      const joinedLease = await leaseService.joinLease(joinLeaseForm.lease_id);
+      
+      // Update local state
       setLeases(prev => [joinedLease, ...prev]);
       setShowJoinLeaseModal(false);
-      setJoinLeaseForm({ ref_code: '' });
+      setJoinLeaseForm({
+        lease_id: '',
+        template_data: {
+          additional_terms: '',
+          utilities_included: [],
+          pets_allowed: false,
+          smoking_allowed: false,
+          notice_period_days: 30
+        }
+      });
+      
+      // Refresh leases data from server to ensure complete sync
+      fetchLeases();
     } catch (err: any) {
       console.error('Error joining lease:', err);
-      if (err.response && err.response.data && err.response.data.message) {
-        setError(`Failed to join lease: ${err.response.data.message}`);
+      if (err.response && err.response.data && err.response.data.errors) {
+        const errorMessages = err.response.data.errors.map((e: any) => e.msg).join(', ');
+        setJoinError(`Failed to join lease: ${errorMessages}`);
+      } else if (err.response && err.response.data && err.response.data.message) {
+        setJoinError(`Failed to join lease: ${err.response.data.message}`);
       } else {
-        setError('Failed to join lease. Please check the reference code and try again.');
+        setJoinError('Failed to join lease. Please check the lease ID and try again.');
       }
     } finally {
       setIsJoining(false);
@@ -470,9 +665,9 @@ export default function Leases() {
 
   const filteredLeases = leases
     .filter(lease => {
-      if (activeRole !== 'all') {
-        if (activeRole === 'landlord' && lease.landlord_id !== currentUser?.id) return false;
-        if (activeRole === 'tenant' && lease.tenant_id !== currentUser?.id) return false;
+      if (activeTab !== 'all') {
+        if (activeTab === 'landlord' && lease.landlord_id !== currentUser?.id) return false;
+        if (activeTab === 'tenant' && lease.tenant_id !== currentUser?.id) return false;
       }
       
       if (statusFilter !== 'all' && lease.status !== statusFilter) return false;
@@ -496,413 +691,333 @@ export default function Leases() {
     });
 
   const handleAction = () => {
-    if (activeRole === 'landlord') {
-      setShowNewLeaseModal(true);
+    if (activeTab === 'landlord') {
+      navigate('/leases/create');
     } else {
       setShowJoinLeaseModal(true);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900">Leases & Rentals</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage your rental agreements and lease contracts
-          </p>
+    <div className="bg-gray-50 min-h-screen">
+      <div className="container mx-auto px-4 py-8 pt-24 max-w-6xl">
+        {/* Page header with description */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">Leases & Rentals</h1>
+          <p className="mt-1 text-sm text-gray-500">Manage your rental agreements and lease contracts</p>
         </div>
 
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
-            <div className="flex">
-              <XCircleIcon className="h-5 w-5 text-red-400" />
-              <p className="ml-3 text-sm text-red-700">{error}</p>
-            </div>
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center">
+            <ExclamationCircleIcon className="h-5 w-5 mr-2" />
+            <span>{error}</span>
           </div>
         )}
 
-        {/* Role Tabs */}
-        <div className="mb-6">
-          <div className="sm:hidden">
-            <select
-              value={activeRole}
-              onChange={(e) => setActiveRole(e.target.value as UserRole)}
-              className="block w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-            >
-              <option value="all">All Leases</option>
-              <option value="landlord">As Landlord</option>
-              <option value="tenant">As Tenant</option>
-            </select>
-          </div>
-          <div className="hidden sm:block">
-            <nav className="flex space-x-4" aria-label="Tabs">
-              {['all', 'landlord', 'tenant'].map((role) => (
-                <button
-                  key={role}
-                  onClick={() => setActiveRole(role as UserRole)}
-                  className={`
-                    px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200
-                    ${activeRole === role
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                    }
-                  `}
-                >
-                  {role === 'all'
-                    ? 'All Leases'
-                    : `As ${role.charAt(0).toUpperCase() + role.slice(1)}`}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
+        {/* Tab navigation */}
+        <LeaseTabs 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          leaseCount={leaseCount}
+        />
 
-        {/* Search and Filters */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-          <div className="flex-1 max-w-lg">
-            <div className="relative rounded-lg shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow duration-200"
-                placeholder="Search leases by property, tenant, or landlord..."
-              />
+        {/* Search and filter row with action buttons */}
+        <div className="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-lg shadow-sm">
+          <div className="relative w-full sm:w-auto flex-grow max-w-lg">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
             </div>
+            <input
+              type="text"
+              placeholder="Search leases by property, tenant, or landlord..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            />
           </div>
-          <div className="flex space-x-3">
+          
+          <div className="flex items-center space-x-3 w-full sm:w-auto">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as LeaseStatus | 'all')}
-              className="rounded-lg border-gray-300 py-2 pl-3 pr-10 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow duration-200"
+              className="block pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white"
             >
               <option value="all">All Status</option>
-              <option value="pending">Pending</option>
+              <option value="draft">Draft</option>
+              <option value="pending">Pending Review</option>
+              <option value="awaiting_landlord_signature">Awaiting Landlord Signature</option>
+              <option value="awaiting_tenant_signature">Awaiting Tenant Signature</option>
+              <option value="changes_requested">Changes Requested</option>
               <option value="active">Active</option>
-              <option value="expiring">Expiring</option>
               <option value="completed">Completed</option>
+              <option value="terminated">Terminated</option>
               <option value="cancelled">Cancelled</option>
             </select>
-            <button
-              onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+            
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+              className="block pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white"
             >
-              {sortOrder === 'asc' ? 'Oldest First' : 'Newest First'}
-            </button>
-            {activeRole !== 'all' && (
-              activeRole === 'tenant' ? (
-                <button
-                  onClick={() => setShowJoinLeaseModal(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                >
-                  <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
-                  Apply Lease
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowNewLeaseModal(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                >
-                  <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
-                  New Lease
-                </button>
-              )
+              <option value="desc">Newest First</option>
+              <option value="asc">Oldest First</option>
+            </select>
+            
+            {/* Action buttons - integrated with dropdowns */}
+            {activeTab === 'landlord' && (
+              <button
+                onClick={() => navigate('/leases/create')}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <PlusIcon className="h-5 w-5 mr-2" />
+                New Lease
+              </button>
+            )}
+            
+            {activeTab === 'tenant' && (
+              <button
+                onClick={() => setShowJoinLeaseModal(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <PlusIcon className="h-5 w-5 mr-2" />
+                Join a Lease
+              </button>
             )}
           </div>
         </div>
 
-        {/* Leases List */}
-        {isLoading ? (
-          <div className="text-center py-12">
-            <div className="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-blue-600 transition ease-in-out duration-150 cursor-not-allowed">
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Loading leases...
+        {/* Leases grid */}
+        <div className="mt-4">
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64 bg-white rounded-lg shadow-sm">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
-          </div>
-        ) : filteredLeases.length === 0 ? (
-          <EmptyState role={activeRole} onAction={handleAction} />
-        ) : (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredLeases.map((lease) => (
-              <LeaseCard
-                key={lease.id}
-                lease={lease}
-                userRole={lease.landlord_id === currentUser?.id ? 'landlord' : 'tenant'}
-              />
-            ))}
-          </div>
-        )}
+          ) : filteredLeases.length === 0 ? (
+            <EmptyState role={activeTab} onAction={handleAction} />
+          ) : (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {filteredLeases.map((lease) => (
+                <LeaseCard
+                  key={lease.id}
+                  lease={lease}
+                  userRole={activeTab === 'all' ? (lease.landlord_id === currentUser?.id ? 'landlord' : 'tenant') : activeTab === 'landlord' ? 'landlord' : 'tenant'}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
-        {/* New Lease Modal */}
-        <Transition.Root show={showNewLeaseModal} as={Fragment}>
-          <Dialog as="div" className="relative z-10" onClose={setShowNewLeaseModal}>
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0"
-              enterTo="opacity-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-            >
-              <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
-            </Transition.Child>
+        {/* Create New Lease Modal */}
+        <Modal
+          isOpen={showNewLeaseModal}
+          onClose={() => setShowNewLeaseModal(false)}
+          title="Create New Lease"
+          size="md"
+        >
+          <form onSubmit={handleCreateLease} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
-            <div className="fixed inset-0 z-10 overflow-y-auto">
-              <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-                <Transition.Child
-                  as={Fragment}
-                  enter="ease-out duration-300"
-                  enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                  enterTo="opacity-100 translate-y-0 sm:scale-100"
-                  leave="ease-in duration-200"
-                  leaveFrom="opacity-100 translate-y-0 sm:scale-100"
-                  leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                >
-                  <Dialog.Panel className="relative transform rounded-lg bg-white px-4 pt-5 pb-4 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
-                    <form onSubmit={handleCreateLease}>
-                      <div>
-                        <Dialog.Title as="h3" className="text-xl font-semibold leading-6 text-gray-900 mb-8">
-                          Create New Lease
-                        </Dialog.Title>
-                        <div className="space-y-6">
-                          {/* Property Details Section */}
-                          <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                            <h4 className="text-sm font-medium text-gray-900">Property Information</h4>
-                            <div>
-                              <label htmlFor="property_name" className="block text-sm font-medium text-gray-700">
-                                Property Name
-                              </label>
-                              <input
-                                type="text"
-                                id="property_name"
-                                required
-                                placeholder="e.g., Sunset Apartments 3B"
-                                value={newLeaseForm.property_name}
-                                onChange={(e) => setNewLeaseForm(prev => ({ ...prev, property_name: e.target.value }))}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                              />
-                            </div>
-                            <div>
-                              <label htmlFor="property_address" className="block text-sm font-medium text-gray-700">
-                                Property Address
-                              </label>
-                              <input
-                                type="text"
-                                id="property_address"
-                                required
-                                placeholder="Full street address"
-                                value={newLeaseForm.property_address}
-                                onChange={(e) => setNewLeaseForm(prev => ({ ...prev, property_address: e.target.value }))}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Financial Details Section */}
-                          <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                            <h4 className="text-sm font-medium text-gray-900">Financial Details</h4>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label htmlFor="monthly_rent" className="block text-sm font-medium text-gray-700">
-                                  Monthly Rent
-                                </label>
-                                <div className="mt-1 relative rounded-md shadow-sm">
-                                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <span className="text-gray-500 sm:text-sm">{CURRENCY_SYMBOLS[newLeaseForm.currency]}</span>
-                                  </div>
-                                  <input
-                                    type="number"
-                                    id="monthly_rent"
-                                    required
-                                    min="0"
-                                    placeholder="0.00"
-                                    value={newLeaseForm.monthly_rent}
-                                    onChange={(e) => setNewLeaseForm(prev => ({ ...prev, monthly_rent: Number(e.target.value) }))}
-                                    className="block w-full pl-7 pr-12 rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                                  />
-                                </div>
-                              </div>
-                              <div>
-                                <label htmlFor="currency" className="block text-sm font-medium text-gray-700">
-                                  Currency
-                                </label>
-                                <select
-                                  id="currency"
-                                  value={newLeaseForm.currency}
-                                  onChange={(e) => setNewLeaseForm(prev => ({ ...prev, currency: e.target.value as Currency }))}
-                                  className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                                >
-                                  {Object.entries(CURRENCY_NAMES).map(([code, name]) => (
-                                    <option key={code} value={code}>
-                                      {CURRENCY_SYMBOLS[code as Currency]} {name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Lease Duration Section */}
-                          <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                            <h4 className="text-sm font-medium text-gray-900">Lease Duration</h4>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label htmlFor="start_date" className="block text-sm font-medium text-gray-700">
-                                  Start Date
-                                </label>
-                                <input
-                                  type="date"
-                                  id="start_date"
-                                  required
-                                  value={newLeaseForm.start_date}
-                                  min={new Date().toISOString().split('T')[0]}
-                                  onChange={(e) => setNewLeaseForm(prev => ({ ...prev, start_date: e.target.value }))}
-                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label htmlFor="end_date" className="block text-sm font-medium text-gray-700">
-                                  End Date
-                                </label>
-                                <input
-                                  type="date"
-                                  id="end_date"
-                                  required
-                                  value={newLeaseForm.end_date}
-                                  min={newLeaseForm.start_date || new Date().toISOString().split('T')[0]}
-                                  onChange={(e) => setNewLeaseForm(prev => ({ ...prev, end_date: e.target.value }))}
-                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-8 sm:flex sm:flex-row-reverse">
-                        <button
-                          type="submit"
-                          disabled={isCreating}
-                          className="inline-flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isCreating ? (
-                            <>
-                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              Creating...
-                            </>
-                          ) : (
-                            'Create Lease'
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowNewLeaseModal(false)}
-                          disabled={isCreating}
-                          className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  </Dialog.Panel>
-                </Transition.Child>
+            <div className="bg-white shadow-sm rounded-lg p-6 border border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Property Details</h3>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="property_name" className="block text-sm font-medium text-gray-700">
+                    Property Name
+                  </label>
+                  <input
+                    type="text"
+                    id="property_name"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    value={newLeaseForm.property_name}
+                    onChange={(e) => setNewLeaseForm({ ...newLeaseForm, property_name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="property_address" className="block text-sm font-medium text-gray-700">
+                    Property Address
+                  </label>
+                  <input
+                    type="text"
+                    id="property_address"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    value={newLeaseForm.property_address}
+                    onChange={(e) => setNewLeaseForm({ ...newLeaseForm, property_address: e.target.value })}
+                    required
+                  />
+                </div>
               </div>
             </div>
-          </Dialog>
-        </Transition.Root>
 
-        {/* Join Lease Modal */}
-        <Transition.Root show={showJoinLeaseModal} as={Fragment}>
-          <Dialog as="div" className="relative z-10" onClose={setShowJoinLeaseModal}>
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0"
-              enterTo="opacity-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-            >
-              <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
-            </Transition.Child>
-
-            <div className="fixed inset-0 z-10 overflow-y-auto">
-              <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-                <Transition.Child
-                  as={Fragment}
-                  enter="ease-out duration-300"
-                  enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                  enterTo="opacity-100 translate-y-0 sm:scale-100"
-                  leave="ease-in duration-200"
-                  leaveFrom="opacity-100 translate-y-0 sm:scale-100"
-                  leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                >
-                  <Dialog.Panel className="relative transform rounded-lg bg-white px-4 pt-5 pb-4 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
-                    <form onSubmit={handleJoinLease}>
-                      <div>
-                        <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900">
-                          Join Existing Lease
-                        </Dialog.Title>
-                        <div className="mt-6">
-                          <label htmlFor="ref_code" className="block text-sm font-medium text-gray-700">
-                            Reference Code
-                          </label>
-                          <input
-                            type="text"
-                            id="ref_code"
-                            required
-                            value={joinLeaseForm.ref_code}
-                            onChange={(e) => setJoinLeaseForm(prev => ({ ...prev, ref_code: e.target.value.toUpperCase() }))}
-                            placeholder="Enter the lease reference code"
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                          />
-                        </div>
+            <div className="bg-white shadow-sm rounded-lg p-6 border border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Lease Terms</h3>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="monthly_rent" className="block text-sm font-medium text-gray-700">
+                      Monthly Rent
+                    </label>
+                    <div className="mt-1 relative rounded-md shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span className="text-gray-500 sm:text-sm">$</span>
                       </div>
-                      <div className="mt-6 sm:mt-8 sm:flex sm:flex-row-reverse">
-                        <button
-                          type="submit"
-                          disabled={isJoining}
-                          className="inline-flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isJoining ? (
-                            <>
-                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              Joining...
-                            </>
-                          ) : (
-                            'Join Lease'
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowJoinLeaseModal(false)}
-                          disabled={isJoining}
-                          className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  </Dialog.Panel>
-                </Transition.Child>
+                      <input
+                        type="number"
+                        id="monthly_rent"
+                        className="pl-7 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        value={newLeaseForm.monthly_rent}
+                        onChange={(e) => setNewLeaseForm({ ...newLeaseForm, monthly_rent: e.target.value ? Number(e.target.value) : 0 })}
+                        required
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="currency" className="block text-sm font-medium text-gray-700">
+                      Currency
+                    </label>
+                    <select
+                      id="currency"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      value={newLeaseForm.currency}
+                      onChange={(e) => setNewLeaseForm({ ...newLeaseForm, currency: e.target.value as Currency })}
+                      required
+                    >
+                      {Object.entries(CURRENCY_NAMES).map(([code, name]) => (
+                        <option key={code} value={code}>
+                          {CURRENCY_SYMBOLS[code as Currency]} {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="start_date" className="block text-sm font-medium text-gray-700">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      id="start_date"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      value={newLeaseForm.start_date}
+                      onChange={(e) => setNewLeaseForm({ ...newLeaseForm, start_date: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="end_date" className="block text-sm font-medium text-gray-700">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      id="end_date"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      value={newLeaseForm.end_date}
+                      onChange={(e) => setNewLeaseForm({ ...newLeaseForm, end_date: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          </Dialog>
-        </Transition.Root>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowNewLeaseModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                disabled={isCreating}
+              >
+                {isCreating ? 'Creating...' : 'Create Lease'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Join Existing Lease Modal */}
+        <Modal
+          isOpen={showJoinLeaseModal}
+          onClose={() => setShowJoinLeaseModal(false)}
+          title="Join Existing Lease"
+          size="md"
+        >
+          <form onSubmit={handleJoinLease} className="space-y-6">
+            {joinError && (
+              <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-red-700">{joinError}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white shadow-sm rounded-lg p-6 border border-gray-200">
+              <p className="text-sm text-gray-600 mb-4">
+                Enter the lease ID provided by your landlord to join an existing lease.
+              </p>
+              <div>
+                <label htmlFor="lease_id" className="block text-sm font-medium text-gray-700">
+                  Lease ID
+                </label>
+                <input
+                  type="text"
+                  id="lease_id"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  value={joinLeaseForm.lease_id}
+                  onChange={(e) => setJoinLeaseForm({ ...joinLeaseForm, lease_id: e.target.value })}
+                  required
+                  placeholder="Enter the lease ID"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowJoinLeaseModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                disabled={isJoining}
+              >
+                {isJoining ? 'Joining...' : 'Join Lease'}
+              </button>
+            </div>
+          </form>
+        </Modal>
       </div>
     </div>
   );
-} 
+};
+
+export default Leases; 

@@ -35,25 +35,25 @@ const socialLinks = [
 
 const navigation = {
   about: [
-    { name: 'About Us', href: '/about' },
-    { name: 'Mission', href: '/mission' },
-    { name: 'Team', href: '/team' },
+    { name: 'About Us', href: '/company' },
+    { name: 'Career', href: '/career' },
+    { name: 'Blog', href: '/blog' },
   ],
   product: [
     { name: 'Features', href: '/features' },
     { name: 'Pricing', href: '/plans' },
-    { name: 'Partners', href: '/partners' },
+    { name: 'How It Works', href: '/how-it-works' },
   ],
   legal: [
-    { name: 'Terms of Service', href: '/terms' },
-    { name: 'Privacy Policy', href: '/privacy' },
-    { name: 'User Agreement', href: '/agreement' },
+    { name: 'Terms of Service', href: '/legal#terms' },
+    { name: 'Privacy Policy', href: '/legal#privacy' },
+    { name: 'FAQ', href: '/legal#user' },
   ],
 };
 
 export default function Footer() {
   return (
-    <footer className="bg-white" aria-labelledby="footer-heading">
+    <footer className="bg-gray-50" aria-labelledby="footer-heading">
       <h2 id="footer-heading" className="sr-only">
         Footer
       </h2>

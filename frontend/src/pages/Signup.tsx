@@ -116,20 +116,20 @@ export default function Signup() {
       setError('');
       setIsLoading(true);
       
-      const success = await register({
+      const result = await register({
         name,
         email,
         password,
         phone
       });
       
-      if (success) {
+      if (result.success) {
         navigate('/dashboard');
       } else {
-        setError('Failed to create an account. Please try again.');
+        setError(result.message || 'Failed to create an account. Please try again.');
       }
-    } catch (err) {
-      setError('An error occurred during registration. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'An error occurred during registration. Please try again.');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -358,13 +358,13 @@ export default function Signup() {
                 </label>
                 <span className="text-gray-500">
                   {' '}
-                  <a href="#" className="font-medium text-primary hover:text-primary-dark">
+                  <Link to="/legal#terms" className="font-medium text-primary hover:text-primary-dark">
                     Terms of Service
-                  </a>
+                  </Link>
                   {' and '}
-                  <a href="#" className="font-medium text-primary hover:text-primary-dark">
+                  <Link to="/legal#privacy" className="font-medium text-primary hover:text-primary-dark">
                     Privacy Policy
-                  </a>
+                  </Link>
                 </span>
               </div>
             </div>
@@ -402,4 +402,4 @@ export default function Signup() {
       </div>
     </div>
   );
-} 
+}

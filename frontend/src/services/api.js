@@ -98,6 +98,53 @@ export const leaseService = {
     const response = await api.put(`/leases/${id}/status`, { status });
     return response.data;
   },
+  getLeaseEvents: async (id) => {
+    const response = await api.get(`/leases/${id}/events`);
+    return response.data;
+  },
+  signLease: async (id, signatureData) => {
+    const response = await api.post(`/leases/${id}/sign`, { signature_data: signatureData });
+    return response.data;
+  },
+  requestChanges: async (id, changes, message) => {
+    const response = await api.post(`/leases/${id}/request-changes`, { changes, message });
+    return response.data;
+  },
+  getChangeRequests: async (id) => {
+    const response = await api.get(`/leases/${id}/change-requests`);
+    return response.data;
+  },
+  respondToChangeRequest: async (id, accepted, message) => {
+    const response = await api.put(`/leases/change-request/${id}`, { accepted, message });
+    return response.data;
+  }
+};
+
+// Add property service
+export const propertyService = {
+  getUserProperties: async () => {
+    const response = await api.get('/api/properties');
+    return response.data;
+  },
+  
+  getProperty: async (id) => {
+    const response = await api.get(`/api/properties/${id}`);
+    return response.data;
+  },
+  
+  createProperty: async (propertyData) => {
+    const response = await api.post('/api/properties', propertyData);
+    return response.data;
+  },
+  
+  updateProperty: async (id, propertyData) => {
+    const response = await api.put(`/api/properties/${id}`, propertyData);
+    return response.data;
+  },
+  
+  deleteProperty: async (id) => {
+    await api.delete(`/api/properties/${id}`);
+  }
 };
 
 // Payment services

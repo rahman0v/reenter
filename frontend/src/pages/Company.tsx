@@ -242,7 +242,7 @@ export default function Company() {
             <div className="flex flex-col items-center text-center">
               <h3 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl mb-4">Vision</h3>
               <p className="text-lg leading-8 text-gray-600">
-              To become the go-to rental ecosystem in Turkey and beyond, where AI-powered leasing replaces outdated processes, and landlords, tenants, and real estate agents interact with transparency, protection, and peace of mind.
+              To become the go-to rental ecosystem in Turkey and beyond, where AI-powered leasing replaces outdated processes. Landlords, tenants, and real estate agents interact with transparency, protection, and peace of mind.
               </p>
             </div>
           </div>

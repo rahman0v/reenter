@@ -217,47 +217,47 @@ export default function Contact() {
           </div>
           
           <motion.div 
-            className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3"
+            className="mx-auto mt-12 grid max-w-2xl grid-cols-1 gap-2 sm:mt-16 lg:mx-0 lg:max-w-none lg:grid-cols-3"
             variants={containerVariants}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
           >
             <motion.div
-              className="flex flex-col items-center text-center"
+              className="flex flex-col items-center text-center bg-gray-50 rounded-lg p-5"
               variants={itemVariants}
             >
               <div className="rounded-full bg-primary-100 p-3">
                 <EnvelopeIcon className="h-6 w-6 text-primary-600" aria-hidden="true" />
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-gray-900">Email Us</h3>
-              <p className="mt-2 text-base text-gray-500">
+              <h3 className="mt-2 text-lg font-semibold text-gray-900">Email Us</h3>
+              <p className="mt-1 text-base text-gray-500">
                 support@reenter.com
               </p>
             </motion.div>
 
             <motion.div
-              className="flex flex-col items-center text-center"
+              className="flex flex-col items-center text-center bg-gray-50 rounded-lg p-5"
               variants={itemVariants}
             >
               <div className="rounded-full bg-primary-100 p-3">
                 <PhoneIcon className="h-6 w-6 text-primary-600" aria-hidden="true" />
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-gray-900">Call Us</h3>
-              <p className="mt-2 text-base text-gray-500">
+              <h3 className="mt-2 text-lg font-semibold text-gray-900">Call Us</h3>
+              <p className="mt-1 text-base text-gray-500">
                 +1 (555) 123-4567
               </p>
             </motion.div>
 
             <motion.div
-              className="flex flex-col items-center text-center"
+              className="flex flex-col items-center text-center bg-gray-50 rounded-lg p-5"
               variants={itemVariants}
             >
               <div className="rounded-full bg-primary-100 p-3">
                 <ChatBubbleLeftRightIcon className="h-6 w-6 text-primary-600" aria-hidden="true" />
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-gray-900">Live Chat</h3>
-              <p className="mt-2 text-base text-gray-500">
+              <h3 className="mt-2 text-lg font-semibold text-gray-900">Live Chat</h3>
+              <p className="mt-1 text-base text-gray-500">
                 Available 24/7
               </p>
             </motion.div>

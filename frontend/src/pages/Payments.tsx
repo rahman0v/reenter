@@ -29,6 +29,7 @@ interface APILease {
   id: string;
   property_name: string;
   tenant_name?: string;
+  landlord_name?: string;
   start_date: string;
   end_date: string;
   monthly_rent: number;
@@ -392,7 +393,13 @@ export default function Payments() {
       const apiLeases = await leaseService.getAllLeases();
       
       // Filter and validate leases
-      const validLeases = apiLeases.filter((lease): lease is APILease => {
+      const validLeases = apiLeases.filter(lease => {
+        // Only include active leases as per requirement
+        if (lease.status !== 'active') {
+          return false;
+        }
+        
+        // Check for required fields and filter by view mode
         return Boolean(
           lease.start_date &&
           lease.end_date &&
@@ -511,7 +518,7 @@ export default function Payments() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 pt-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">

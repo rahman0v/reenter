@@ -14,6 +14,7 @@ CREATE TABLE users (
     employment_status VARCHAR(50),
     date_of_birth DATE,
     trust_score INTEGER DEFAULT 0,
+    role VARCHAR(20) DEFAULT 'user',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -54,6 +55,57 @@ CREATE TABLE bank_accounts (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Leases table
+CREATE TABLE leases (
+    id SERIAL PRIMARY KEY,
+    landlord_id INTEGER REFERENCES users(id),
+    tenant_id INTEGER REFERENCES users(id),
+    property_name VARCHAR(255) NOT NULL,
+    property_address TEXT NOT NULL,
+    monthly_rent DECIMAL(10,2) NOT NULL,
+    premium DECIMAL(10,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'USD',
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'pending',
+    ref_code VARCHAR(8) UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Lease Events table
+CREATE TABLE lease_events (
+    id SERIAL PRIMARY KEY,
+    lease_id INTEGER REFERENCES leases(id),
+    user_id INTEGER REFERENCES users(id),
+    event_type VARCHAR(50) NOT NULL,
+    details JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Lease Change Requests table
+CREATE TABLE lease_change_requests (
+    id SERIAL PRIMARY KEY,
+    lease_id INTEGER REFERENCES leases(id),
+    requested_by INTEGER REFERENCES users(id),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    requested_changes JSONB NOT NULL,
+    response_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Lease Signatures table
+CREATE TABLE lease_signatures (
+    id SERIAL PRIMARY KEY,
+    lease_id INTEGER REFERENCES leases(id),
+    user_id INTEGER REFERENCES users(id),
+    signature_data TEXT NOT NULL,
+    signed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    ip_address VARCHAR(45),
+    user_agent TEXT
+);
+
 -- Ratings table
 CREATE TABLE ratings (
     id SERIAL PRIMARY KEY,
@@ -63,21 +115,6 @@ CREATE TABLE ratings (
     rating INTEGER CHECK (rating >= 1 AND rating <= 5),
     comment TEXT,
     role VARCHAR(20) NOT NULL, -- 'landlord' or 'tenant'
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Leases table
-CREATE TABLE leases (
-    id SERIAL PRIMARY KEY,
-    landlord_id INTEGER REFERENCES users(id),
-    tenant_id INTEGER REFERENCES users(id),
-    property_address TEXT NOT NULL,
-    monthly_rent DECIMAL(10,2) NOT NULL,
-    premium DECIMAL(10,2) NOT NULL,
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -116,6 +153,11 @@ CREATE INDEX idx_bank_accounts_user_id ON bank_accounts(user_id);
 CREATE INDEX idx_ratings_reviewer_id ON ratings(reviewer_id);
 CREATE INDEX idx_ratings_reviewed_id ON ratings(reviewed_id);
 CREATE INDEX idx_ratings_lease_id ON ratings(lease_id);
+CREATE INDEX idx_lease_events_lease_id ON lease_events(lease_id);
+CREATE INDEX idx_lease_events_user_id ON lease_events(user_id);
+CREATE INDEX idx_lease_change_requests_lease_id ON lease_change_requests(lease_id);
+CREATE INDEX idx_lease_signatures_lease_id ON lease_signatures(lease_id);
+CREATE INDEX idx_lease_signatures_user_id ON lease_signatures(user_id);
 
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -166,4 +208,9 @@ CREATE TRIGGER update_bank_accounts_updated_at
 CREATE TRIGGER update_ratings_updated_at
     BEFORE UPDATE ON ratings
     FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column(); 
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_lease_change_requests_updated_at
+    BEFORE UPDATE ON lease_change_requests
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

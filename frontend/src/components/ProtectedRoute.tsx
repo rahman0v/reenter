@@ -6,9 +6,9 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, isLoading } = useAuth();
 
-  if (loading) {
+  if (isLoading) {
     // Render a loading indicator
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">

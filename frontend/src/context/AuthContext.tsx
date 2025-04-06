@@ -1,147 +1,309 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { userService } from '../services/api';
 
-// Define User interface locally
-interface User {
+// Feature flags from environment
+const isDemoMode = import.meta.env.VITE_ENABLE_DEMO_MODE === 'true';
+
+// User interface
+export interface User {
   id: number;
   name: string;
   email: string;
-  role: string;
-  is_active: boolean;
-  verifications: {
-    email: boolean;
-    phone: boolean;
-    identity: boolean;
-  };
-  created_at: string;
-  updated_at: string;
   phone: string;
-  photo_url: string;
-  bio: string;
+  role: string;
+  photo_url?: string;
+  bio?: string;
+  preferred_name?: string;
+  address?: string;
+  emergency_contact?: string;
+  education_status?: string;
+  employment_status?: string;
+  date_of_birth?: string;
+  created_at: string;
+  updated_at?: string;
 }
 
+// Registration data interface
+export interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+}
+
+// Login credentials interface
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+// Auth context interface
 interface AuthContextType {
   currentUser: User | null;
-  login: (token: string, user: User) => void;
-  logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (credentials: LoginCredentials) => Promise<{ success: boolean; message?: string }>;
+  register: (data: RegisterData) => Promise<{ success: boolean; message?: string }>;
+  logout: () => void;
 }
 
+// Create the context with undefined default value
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Determine API URL based on environment
+const API_URL = import.meta.env.VITE_API_URL || 
+                (window.location.hostname === 'localhost' 
+                 ? 'http://localhost:5000/api'
+                 : '/api');
+
+// Provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
-  // Effect to synchronize isAuthenticated with currentUser
+  // Initialize auth state from local storage on component mount
   useEffect(() => {
-    // If currentUser exists, ensure isAuthenticated is true
-    if (currentUser) {
-      console.log('User exists, setting isAuthenticated to true');
-      setIsAuthenticated(true);
-    }
-  }, [currentUser]);
+    const initializeAuth = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setIsLoading(false);
+          return;
+        }
 
-  useEffect(() => {
-    console.log('AuthContext initializing...');
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      console.log('No token found, not authenticated');
-      setCurrentUser(null);
-      setIsAuthenticated(false);
-      setLoading(false);
-      return;
-    }
-    
-    console.log('Token found, checking for stored user data');
-    
-    // If we already have user data in localStorage, use it first for immediate UI update
-    try {
-      const storedUser = localStorage.getItem('userData');
-      if (storedUser) {
-        const userData = JSON.parse(storedUser);
-        console.log('Using stored user data:', userData.email);
-        // Use type assertion to avoid TypeScript errors
-        setCurrentUser(userData as User);
-        setIsAuthenticated(true);
-        setLoading(false);
-        return; // Skip profile fetching if we have stored user data
+        // Get user data from storage first for immediate UI update
+        const storedUserData = localStorage.getItem('userData');
+        if (storedUserData) {
+          try {
+            const userData = JSON.parse(storedUserData);
+            setCurrentUser(userData);
+            setIsAuthenticated(true);
+          } catch (err) {
+            localStorage.removeItem('userData');
+          }
+        }
+
+        // Then validate token with server
+        await fetchUserProfile(token);
+      } catch (error) {
+        // Clear invalid auth data
+        handleAuthError(error);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (e) {
-      console.error('Error parsing stored user data:', e);
-    }
-    
-    // Fetch the profile
-    console.log('Fetching user profile...');
-    userService.getProfile()
-      .then(user => {
-        console.log('Profile fetched successfully:', user.email);
-        // Convert to User type
-        const userData: User = {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: 'user',
-          is_active: true,
-          verifications: {
-            email: user.verifications?.email || false,
-            phone: user.verifications?.phone || false,
-            identity: user.verifications?.id || false
-          },
-          created_at: user.created_at,
-          updated_at: user.updated_at || '',
-          phone: user.phone || '',
-          photo_url: user.photo_url || '',
-          bio: user.bio || ''
-        };
-        
-        // Save the user data to localStorage for future use
-        localStorage.setItem('userData', JSON.stringify(userData));
-        
-        setCurrentUser(userData);
-        setIsAuthenticated(true);
-      })
-      .catch((error) => {
-        console.error('Error fetching user profile:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('userData');
-        setCurrentUser(null);
-        setIsAuthenticated(false);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    };
+
+    initializeAuth();
   }, []);
 
-  const login = (token: string, user: User) => {
-    console.log('Login called with token and user:', user.email);
-    localStorage.setItem('token', token);
-    localStorage.setItem('userData', JSON.stringify(user));
-    setCurrentUser(user);
-    setIsAuthenticated(true);
+  // Handle authentication errors consistently
+  const handleAuthError = (error: any) => {
+    // Clear stored auth data
+    localStorage.removeItem('token');
+    localStorage.removeItem('userData');
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    
+    // Set error message
+    const errorMessage = 
+      error?.response?.data?.message || 
+      error?.message || 
+      'An authentication error occurred';
+    
+    setAuthError(errorMessage);
+    
+    // Log in development only
+    if (import.meta.env.DEV) {
+      console.error('Auth error:', error);
+    }
   };
 
+  // Fetch user profile from the server
+  const fetchUserProfile = async (token: string) => {
+    try {
+      const response = await fetch(`${API_URL}/auth/me`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+
+      const data = await response.json();
+      if (data.success && data.user) {
+        setCurrentUser(data.user);
+        setIsAuthenticated(true);
+        // Update stored user data
+        localStorage.setItem('userData', JSON.stringify(data.user));
+      } else {
+        throw new Error(data.message || 'Invalid user data');
+      }
+    } catch (error) {
+      handleAuthError(error);
+      throw error;
+    }
+  };
+
+  // Register new user
+  const register = async (data: RegisterData): Promise<{ success: boolean; message?: string }> => {
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          message: responseData.message || 'Registration failed'
+        };
+      }
+
+      // Save token and user data
+      localStorage.setItem('token', responseData.token);
+      localStorage.setItem('userData', JSON.stringify(responseData.user));
+      
+      // Update state
+      setCurrentUser(responseData.user);
+      setIsAuthenticated(true);
+      
+      return {
+        success: true,
+        message: 'Registration successful'
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred'
+      };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Login user
+  const login = async (credentials: LoginCredentials): Promise<{ success: boolean; message?: string }> => {
+    try {
+      setIsLoading(true);
+      
+      // Special handling for demo mode
+      if (isDemoMode && credentials.email === 'demo@reenter.com') {
+        // In demo mode, allow special login without server call
+        const demoLoginResponse = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(credentials)
+        });
+        
+        const demoData = await demoLoginResponse.json();
+        
+        if (demoData.success) {
+          localStorage.setItem('token', demoData.token);
+          localStorage.setItem('userData', JSON.stringify(demoData.user));
+          setCurrentUser(demoData.user);
+          setIsAuthenticated(true);
+          return { success: true, message: 'Demo login successful' };
+        }
+      }
+      
+      // Normal login flow
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(credentials)
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          message: data.message || 'Login failed'
+        };
+      }
+
+      if (!data.token) {
+        return {
+          success: false,
+          message: 'Authentication error: No token received'
+        };
+      }
+
+      if (!data.user) {
+        return {
+          success: false,
+          message: 'Authentication error: No user data received'
+        };
+      }
+
+      // Save token and user data
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('userData', JSON.stringify(data.user));
+      
+      // Update state
+      setCurrentUser(data.user);
+      setIsAuthenticated(true);
+      
+      return {
+        success: true,
+        message: 'Login successful'
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred'
+      };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Logout user
   const logout = () => {
-    console.log('Logout called');
     localStorage.removeItem('token');
     localStorage.removeItem('userData');
     setCurrentUser(null);
     setIsAuthenticated(false);
   };
 
+  // Provide the auth context
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout, isAuthenticated }}>
-      {!loading ? children : <div>Loading...</div>}
+    <AuthContext.Provider
+      value={{
+        currentUser,
+        isAuthenticated,
+        isLoading,
+        login,
+        register,
+        logout
+      }}
+    >
+      {children}
     </AuthContext.Provider>
   );
 };
 
+// Custom hook to use auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}; 
+};

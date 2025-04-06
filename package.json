@@ -6,5 +6,8 @@
     "autoprefixer": "^9.8.8",
     "postcss": "^7.0.39",
     "tailwindcss": "^4.0.17"
+  },
+  "dependencies": {
+    "date-fns": "^4.1.0"
   }
 }

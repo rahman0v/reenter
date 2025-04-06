@@ -335,6 +335,7 @@ export default function Profile() {
     photo_url: '',
     created_at: '',
     updated_at: '',
+    role: 'tenant',
     trust_score: 0,
     verifications: {
       email: false,
@@ -473,20 +474,63 @@ export default function Profile() {
       setError(null);
       setSuccess(null);
       
-      const { id, name, email, phone, bio, photo_url, created_at, updated_at, ...extraFields } = profileData;
-      await userService.updateProfile({ name, email, phone, bio, photo_url });
+      // Create an object with only the fields that have been edited
+      const fieldsToUpdate: Record<string, any> = {};
+      
+      // Get list of edited field names
+      const editedFields = Object.keys(editingFields).filter(field => editingFields[field]);
+      
+      // Only include fields that have actually been edited
+      editedFields.forEach(field => {
+        // Only add if the field exists in profileData
+        if (field in profileData) {
+          fieldsToUpdate[field] = profileData[field as keyof User];
+        }
+      });
+      
+      // Log what we're about to update
+      console.log('Saving profile changes for fields:', editedFields);
+      console.log('Data to send:', fieldsToUpdate);
+      
+      // Don't make the API call if there are no fields to update
+      if (Object.keys(fieldsToUpdate).length === 0) {
+        setSuccess('No changes to save');
+        setTimeout(() => setSuccess(null), 3000);
+        setEditingFields({});
+        setIsSaving(false);
+        return;
+      }
+      
+      // Update profile with the changes
+      await userService.updateProfile(fieldsToUpdate);
+      
+      // Show success message
       setSuccess('Profile updated successfully');
       
       // Close all editing fields after saving
       setEditingFields({});
       
+      // Refresh profile data
+      try {
+        const updatedData = await userService.getProfile();
+        setProfileData({
+          ...profileData,
+          ...updatedData
+        });
+      } catch (refreshErr) {
+        console.error('Error refreshing profile data:', refreshErr);
+        // Don't show an error since the save was successful
+      }
+      
       // Show success message for 3 seconds
       setTimeout(() => {
         setSuccess(null);
       }, 3000);
-    } catch (err) {
-      setError('Failed to update profile');
+    } catch (err: any) {
       console.error('Error updating profile:', err);
+      setError(err.message || 'Failed to update profile');
+      
+      // Keep editing fields open if there was an error
     } finally {
       setIsSaving(false);
     }
@@ -495,38 +539,62 @@ export default function Profile() {
   const handleSocialConnect = async (platform: string) => {
     try {
       await userService.connectSocialAccount(platform);
-      setProfileData(prev => ({
-        ...prev,
-        social_connections: {
-          ...prev.social_connections,
-          [platform.toLowerCase()]: true
-        }
-      }));
-    } catch (err) {
-      setError(`Failed to connect ${platform} account`);
-    }
-  };
-  
-  const handleVerify = async (type: string) => {
-    try {
-      // Since verifyAccount doesn't exist in the API service, we'll simulate it
-      // In a real implementation, you would add this method to the API service
-      console.log(`Verifying ${type}...`);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Update local state to reflect the connection
+      setProfileData(prev => {
+        // Create a new object with all the properties of prev
+        const updated = { ...prev };
+        
+        // Ensure social_connections exists and is a new object
+        updated.social_connections = { ...prev.social_connections };
+        
+        // Set the specific platform to true
+        if (platform === 'google') updated.social_connections.google = true;
+        if (platform === 'instagram') updated.social_connections.instagram = true;
+        if (platform === 'linkedin') updated.social_connections.linkedin = true;
+        if (platform === 'twitter') updated.social_connections.twitter = true;
+        if (platform === 'facebook') updated.social_connections.facebook = true;
+        
+        return updated;
+      });
       
-      setProfileData(prev => ({
-        ...prev,
-        verifications: {
-          ...prev.verifications,
-          [type]: true
-        }
-      }));
-      
-      setSuccess(`${type} verification successful`);
+      setSuccess(`Successfully connected ${platform}`);
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
+      console.error(`Error connecting ${platform}:`, err);
+      setError(`Failed to connect ${platform}`);
+    }
+  };
+
+  const handleVerify = async (type: string) => {
+    try {
+      setError(null);
+      
+      // Here you would normally call an API to verify this information
+      // For the demo, we'll just simulate a successful verification after a delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Update local state to reflect verification
+      setProfileData(prev => {
+        // Create a new object with all the properties of prev
+        const updated = { ...prev };
+        
+        // Ensure verifications exists and is a new object
+        updated.verifications = { ...prev.verifications };
+        
+        // Set the specific verification to true
+        if (type === 'email') updated.verifications.email = true;
+        if (type === 'phone') updated.verifications.phone = true;
+        if (type === 'id') updated.verifications.id = true;
+        if (type === 'bank') updated.verifications.bank = true;
+        
+        return updated;
+      });
+      
+      setSuccess(`${type.charAt(0).toUpperCase() + type.slice(1)} verified successfully`);
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error(`Error verifying ${type}:`, err);
       setError(`Failed to verify ${type}`);
     }
   };
@@ -552,8 +620,8 @@ export default function Profile() {
   const profileCompletion = calculateProfileCompletion();
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 pt-24">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Section Title */}
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Profile Information</h1>
         <p className="text-gray-500 mb-8">Manage your personal information and account settings</p>
