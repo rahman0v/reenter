@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { paymentService, leaseService } from '../services/api';
 import { Dialog, Transition } from '@headlessui/react';
@@ -17,11 +17,12 @@ import {
   ChevronRightIcon,
   DocumentTextIcon,
 } from '@heroicons/react/24/outline';
+import { Payment, PaymentStatus, ViewMode } from '../types';
+import { formatCurrency } from '../utils/currency';
+import Container from '../components/Container';
 
 // Types
-type ViewMode = 'tenant' | 'landlord';
 type Currency = string;
-type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'upcoming';
 type PaymentMethod = string;
 type TransferMethod = string;
 
@@ -45,24 +46,6 @@ interface Lease extends APILease {
   created_at: string;
 }
 
-interface Payment {
-  id: string;
-  property_name: string;
-  counterparty_name: string;
-  due_date: string;
-  amount: number;
-  currency: Currency;
-  status: PaymentStatus;
-  payment_method?: PaymentMethod;
-  transfer_method?: TransferMethod;
-  transfer_ref?: string;
-  commission_amount?: number;
-  tax_amount?: number;
-  total_amount: number;
-  receipt_url?: string;
-  created_at?: string;
-}
-
 interface SummaryCardProps {
   title: string;
   amount: number;
@@ -84,23 +67,23 @@ interface PaymentDetailsModalProps {
 
 // Helper Components
 const SummaryCard = ({ title, amount, currency, icon: Icon, trend, isNegative }: SummaryCardProps) => (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-200">
+  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200 transform hover:scale-[1.02]">
     <div className="flex items-center">
       <div className="flex-shrink-0">
-        <div className="p-2 bg-blue-50 rounded-lg">
-          <Icon className="h-6 w-6 text-blue-600" aria-hidden="true" />
+        <div className="p-3 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl shadow-sm">
+          <Icon className="h-6 w-6 text-emerald-600" aria-hidden="true" />
         </div>
       </div>
       <div className="ml-4 w-0 flex-1">
         <dl>
           <dt className="text-sm font-medium text-gray-600 truncate">{title}</dt>
           <dd className="flex items-baseline">
-            <div className={`text-2xl font-semibold ${isNegative ? 'text-red-600' : 'text-gray-900'}`}>
+            <div className={`text-2xl font-semibold ${isNegative ? 'text-red-600' : 'bg-gradient-to-r from-emerald-600 to-emerald-800 bg-clip-text text-transparent'}`}>
               {currency} {Math.abs(amount).toLocaleString()}
             </div>
             {trend && (
               <div className={`ml-2 flex items-baseline text-sm font-semibold ${
-                trend.isPositive ? 'text-green-600' : 'text-red-600'
+                trend.isPositive ? 'text-emerald-600' : 'text-red-600'
               }`}>
                 {trend.isPositive ? '↑' : '↓'} {trend.value}%
               </div>
@@ -177,13 +160,13 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, viewMode }: PaymentDeta
                 <div className="mt-4 space-y-4">
                   <div className="flex justify-between">
                     <p className="text-sm font-medium text-gray-500">Property</p>
-                    <p className="text-sm text-gray-900">{payment.property_name}</p>
+                    <p className="text-sm text-gray-900">{payment.property_name || 'Unnamed Property'}</p>
                   </div>
                   <div className="flex justify-between">
                     <p className="text-sm font-medium text-gray-500">
                       {viewMode === 'tenant' ? 'Landlord' : 'Tenant'}
                     </p>
-                    <p className="text-sm text-gray-900">{payment.counterparty_name}</p>
+                    <p className="text-sm text-gray-900">{payment.counterparty_name || 'Unknown'}</p>
                   </div>
                   <div className="flex justify-between">
                     <p className="text-sm font-medium text-gray-500">Due Date</p>
@@ -194,14 +177,14 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, viewMode }: PaymentDeta
                   <div className="flex justify-between">
                     <p className="text-sm font-medium text-gray-500">Monthly Rent</p>
                     <p className="text-sm text-gray-900">
-                      {payment.currency} {payment.amount.toLocaleString()}
+                      {payment.currency || 'USD'} {payment.amount.toLocaleString()}
                     </p>
                   </div>
                   {viewMode === 'tenant' && payment.commission_amount && (
                     <div className="flex justify-between">
                       <p className="text-sm font-medium text-gray-500">Platform Premium (8.5%)</p>
                       <p className="text-sm text-gray-900">
-                        {payment.currency} {payment.commission_amount.toLocaleString()}
+                        {payment.currency || 'USD'} {payment.commission_amount.toLocaleString()}
                       </p>
                     </div>
                   )}
@@ -209,7 +192,7 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, viewMode }: PaymentDeta
                     <div className="flex justify-between">
                       <p className="text-sm font-medium text-gray-500">Tax Deduction (21%)</p>
                       <p className="text-sm text-gray-900">
-                        {payment.currency} {payment.tax_amount.toLocaleString()}
+                        {payment.currency || 'USD'} {payment.tax_amount.toLocaleString()}
                       </p>
                     </div>
                   )}
@@ -218,7 +201,7 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, viewMode }: PaymentDeta
                       {viewMode === 'tenant' ? 'Total to Pay' : 'Net Amount'}
                     </p>
                     <p className="text-sm font-semibold text-gray-900">
-                      {payment.currency} {payment.total_amount.toLocaleString()}
+                      {payment.currency || 'USD'} {(payment.total_amount || 0).toLocaleString()}
                     </p>
                   </div>
                   <div className="flex justify-between">
@@ -267,108 +250,199 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, viewMode }: PaymentDeta
   );
 };
 
-const PaymentCard = ({ payment, viewMode }: { payment: Payment; viewMode: ViewMode }) => {
-  const [showDetails, setShowDetails] = useState(false);
+const formatDate = (dateString: string | undefined): string => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return '';
+  }
+};
+
+const PaymentStatusBadge: React.FC<{ status: PaymentStatus, viewMode: ViewMode }> = ({ status, viewMode }) => {
+  const getStatusColor = (status: PaymentStatus): string => {
+    switch (status) {
+      case 'paid':
+        return 'bg-emerald-100 text-emerald-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'overdue':
+        return 'bg-red-100 text-red-800';
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Transform status text based on viewMode
+  const getStatusText = (status: PaymentStatus, viewMode: ViewMode): string => {
+    if (viewMode === 'landlord') {
+      switch (status) {
+        case 'paid':
+          return 'Received';
+        case 'pending':
+          return 'Incoming';
+        default:
+          return status.charAt(0).toUpperCase() + status.slice(1);
+      }
+    }
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow duration-200">
-      <div className="p-6">
-        <div className="flex justify-between items-start mb-4">
+    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(status)}`}>
+      {getStatusText(status, viewMode)}
+    </span>
+  );
+};
+
+const PaymentCard: React.FC<{ payment: Payment, viewMode: ViewMode }> = ({ payment, viewMode }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const isPending = payment.status === 'pending' || payment.status === 'upcoming';
+  const showPayButton = viewMode === 'tenant' && isPending;
+
+  return (
+    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200">
+      {/* Header with property name and status */}
+      <div className="p-5 border-b border-gray-100">
+        <div className="flex justify-between items-center">
           <h3 className="text-lg font-semibold text-gray-900">{payment.property_name}</h3>
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-            payment.status === 'paid' ? 'bg-green-50 text-green-700' :
-            payment.status === 'pending' ? 'bg-yellow-50 text-yellow-700' :
-            payment.status === 'overdue' ? 'bg-red-50 text-red-700' :
-            'bg-blue-50 text-blue-700'
-          }`}>
-            {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
-          </span>
+          <PaymentStatusBadge status={payment.status} viewMode={viewMode} />
         </div>
-
-        <div className="space-y-4">
-          <div className="flex justify-between items-center py-2 border-b border-gray-100">
-            <p className="text-sm font-medium text-gray-600">
-              {viewMode === 'tenant' ? 'Landlord' : 'Tenant'}:
+      </div>
+      
+      {/* Payment details with labels and values side by side */}
+      <div className="p-5">
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <p className="text-sm font-bold text-gray-700">
+              {viewMode === 'tenant' ? 'To:' : 'From:'}
             </p>
-            <p className="text-sm text-gray-900">{payment.counterparty_name}</p>
+            <p className="text-sm text-gray-800">{payment.counterparty_name}</p>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-gray-100">
-            <p className="text-sm font-medium text-gray-600">Due Date:</p>
-            <p className="text-sm text-gray-900">
-              {new Date(payment.due_date).toLocaleDateString()}
+          
+          <div className="flex justify-between items-center">
+            <p className="text-sm font-bold text-gray-700">Due Date:</p>
+            <p className="text-sm text-gray-800">{formatDate(payment.due_date)}</p>
+          </div>
+          
+          {payment.created_at && payment.status === 'paid' && (
+            <div className="flex justify-between items-center">
+              <p className="text-sm font-bold text-gray-700">Transaction Date:</p>
+              <p className="text-sm text-gray-800">{formatDate(payment.created_at)}</p>
+            </div>
+          )}
+          
+          <div className="flex justify-between items-center">
+            <p className="text-sm font-bold text-gray-700">Base Amount:</p>
+            <p className="text-sm text-gray-800">
+              {formatCurrency(payment.amount, payment.currency)}
             </p>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-gray-100">
-            <p className="text-sm font-medium text-gray-600">Monthly Rent:</p>
-            <p className="text-sm text-gray-900">
-              {payment.currency} {Math.round(payment.amount).toLocaleString()}
+          
+          {(viewMode === 'tenant' && payment.commission_amount) || (viewMode === 'landlord' && payment.tax_amount) ? (
+            <div className="flex justify-between items-center">
+              <p className="text-sm font-bold text-gray-700">
+                {viewMode === 'tenant' ? 'Platform Fee:' : 'Tax Deduction:'}
+              </p>
+              <p className="text-sm text-gray-800">
+                {viewMode === 'tenant' && payment.commission_amount
+                  ? formatCurrency(payment.commission_amount, payment.currency)
+                  : viewMode === 'landlord' && payment.tax_amount
+                    ? formatCurrency(payment.tax_amount, payment.currency)
+                    : '—'}
+              </p>
+            </div>
+          ) : null}
+          
+          {payment.payment_method && (
+            <div className="flex justify-between items-center">
+              <p className="text-sm font-bold text-gray-700">Payment Method:</p>
+              <p className="text-sm text-gray-800 capitalize">
+                {payment.payment_method} •••• 
+              </p>
+            </div>
+          )}
+          
+          {payment.transfer_ref && (
+            <div className="flex justify-between items-center">
+              <p className="text-sm font-bold text-gray-700">Reference:</p>
+              <p className="text-sm text-gray-800">{payment.transfer_ref}</p>
+            </div>
+          )}
+          
+          <div className="flex justify-between items-center border-t border-gray-100 pt-3 mt-3">
+            <p className="text-sm font-bold text-gray-700">
+              {viewMode === 'tenant' ? 'Total to Pay:' : 'Net Amount:'}
             </p>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b border-gray-100">
-            <p className="text-sm font-medium text-gray-600">
-              {viewMode === 'tenant' ? 'Platform Premium' : 'Tax Deduction'}:
-            </p>
-            <p className="text-sm text-gray-900">
-              {payment.currency} {Math.round(viewMode === 'tenant' ? payment.commission_amount || 0 : payment.tax_amount || 0).toLocaleString()}
-            </p>
-          </div>
-          <div className="flex justify-between items-center py-2">
-            <p className="text-sm font-medium text-gray-600">
-              {viewMode === 'tenant' ? 'Total to Pay' : 'Net Amount'}:
-            </p>
-            <p className="text-sm font-semibold text-gray-900">
-              {payment.currency} {Math.round(payment.total_amount).toLocaleString()}
+            <p className="text-base font-semibold text-gray-900">
+              {formatCurrency(payment.total_amount, payment.currency)}
             </p>
           </div>
         </div>
-
-        <div className="mt-6 flex justify-end space-x-3">
-          {viewMode === 'tenant' && payment.status !== 'paid' && (
+        
+        {/* Action buttons */}
+        <div className="flex items-center justify-end mt-5 pt-5 border-t border-gray-100 space-x-3">
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-emerald-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            <DocumentTextIcon className="h-5 w-5 mr-2" />
+            View Details
+          </button>
+          
+          {showPayButton && (
             <button
-              onClick={() => {/* Handle payment */}}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm transform hover:scale-105 transition-all duration-200"
             >
+              <CreditCardIcon className="h-5 w-5 mr-2" />
               Pay Now
             </button>
           )}
-          {payment.receipt_url && (
-            <button
-              onClick={() => window.open(payment.receipt_url, '_blank')}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-            >
-              <DocumentTextIcon className="-ml-1 mr-2 h-5 w-5" />
-              Receipt
-            </button>
-          )}
-          <button
-            onClick={() => setShowDetails(true)}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-          >
-            View Details
-          </button>
         </div>
       </div>
-      <PaymentDetailsModal
-        payment={payment}
-        isOpen={showDetails}
-        onClose={() => setShowDetails(false)}
-        viewMode={viewMode}
-      />
+      
+      {/* Payment Details Modal */}
+      {isModalOpen && (
+        <PaymentDetailsModal
+          payment={payment}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          viewMode={viewMode}
+        />
+      )}
     </div>
   );
 };
 
-const EmptyState = ({ viewMode }: { viewMode: ViewMode }) => (
+const EmptyState: React.FC<{ viewMode: ViewMode }> = ({ viewMode }) => (
   <div className="text-center py-12">
-    <BanknotesIcon className="mx-auto h-12 w-12 text-gray-400" />
-    <h3 className="mt-2 text-sm font-medium text-gray-900">No {viewMode === 'tenant' ? 'payments' : 'payouts'} yet</h3>
-    <p className="mt-1 text-sm text-gray-500">
-      {viewMode === 'tenant'
-        ? "You haven't made any payments yet. Once your lease begins, payments will show here."
-        : "You haven't received any payouts yet. Once your tenants make payments, they will show here."}
+    <p className="text-gray-500 text-lg">
+      No {viewMode === 'all' ? '' : viewMode + ' '}payments found
     </p>
   </div>
 );
+
+const PaymentList: React.FC<{ payments: Payment[]; viewMode: ViewMode }> = ({ payments, viewMode }) => {
+  return (
+    <div className="space-y-4">
+      {payments.length > 0 ? (
+        payments.map((payment) => (
+          <PaymentCard key={payment.id} payment={payment} viewMode={viewMode} />
+        ))
+      ) : (
+        <EmptyState viewMode={viewMode} />
+      )}
+    </div>
+  );
+};
 
 // Main Component
 export default function Payments() {
@@ -379,6 +453,8 @@ export default function Payments() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchPaymentsFromLeases();
@@ -517,154 +593,135 @@ export default function Payments() {
     return true;
   });
 
+  if (loading) {
+    return (
+      <Container>
+        <div className="flex justify-center items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
+        </div>
+      </Container>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 pt-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            {viewMode === 'tenant' ? 'Payments' : 'Payouts'}
-          </h1>
-          <p className="mt-2 text-lg text-gray-600">
-            {viewMode === 'tenant'
-              ? 'Manage your rental payments and view payment history'
-              : 'Track your rental income and payout history'}
-          </p>
-        </div>
+    <Container>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 bg-gradient-to-r from-emerald-600 to-emerald-800 bg-clip-text text-transparent">
+          Payments & Payouts
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Manage and track your rental payments & payouts
+        </p>
+      </div>
 
-        {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
-            <div className="flex">
-              <XCircleIcon className="h-5 w-5 text-red-400" />
-              <p className="ml-3 text-sm text-red-700">{error}</p>
-            </div>
+      {error && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
+          <div className="flex">
+            <XCircleIcon className="h-5 w-5 text-red-400" />
+            <p className="ml-3 text-sm text-red-700">{error}</p>
           </div>
+        </div>
+      )}
+
+      {/* View Mode Toggle */}
+      <div className="mb-8">
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => setViewMode('tenant')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
+              viewMode === 'tenant'
+                ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <UserIcon className="h-5 w-5 inline-block mr-2" />
+            As Tenant
+          </button>
+          <button
+            onClick={() => setViewMode('landlord')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
+              viewMode === 'landlord'
+                ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <BuildingOfficeIcon className="h-5 w-5 inline-block mr-2" />
+            As Landlord
+          </button>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <SummaryCard
+          title={viewMode === 'tenant' ? 'Total Paid' : 'Total Payouts'}
+          amount={summary.totalAmount}
+          currency="₺"
+          icon={BanknotesIcon}
+        />
+        <SummaryCard
+          title="Upcoming Due"
+          amount={summary.upcomingDue}
+          currency="₺"
+          icon={ClockIcon}
+        />
+        {summary.overdue > 0 && (
+          <SummaryCard
+            title="Overdue"
+            amount={summary.overdue}
+            currency="₺"
+            icon={ExclamationCircleIcon}
+            isNegative
+          />
         )}
+        <SummaryCard
+          title={viewMode === 'tenant' ? 'Last Payment' : 'Last Transfer'}
+          amount={summary.lastPayment}
+          currency="₺"
+          icon={ArrowDownTrayIcon}
+        />
+      </div>
 
-        {/* View Mode Tabs */}
-        <div className="mb-8">
-          <div className="sm:hidden">
-            <select
-              value={viewMode}
-              onChange={(e) => setViewMode(e.target.value as ViewMode)}
-              className="block w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-            >
-              <option value="tenant">As Tenant</option>
-              <option value="landlord">As Landlord</option>
-            </select>
-          </div>
-          <div className="hidden sm:block">
-            <nav className="flex space-x-4" aria-label="Tabs">
-              <button
-                onClick={() => setViewMode('tenant')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                  viewMode === 'tenant'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                As Tenant
-              </button>
-              <button
-                onClick={() => setViewMode('landlord')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                  viewMode === 'landlord'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                As Landlord
-              </button>
-            </nav>
-          </div>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <SummaryCard
-            title={viewMode === 'tenant' ? 'Total Paid' : 'Total Payouts'}
-            amount={summary.totalAmount}
-            currency="₺"
-            icon={BanknotesIcon}
-          />
-          <SummaryCard
-            title="Upcoming Due"
-            amount={summary.upcomingDue}
-            currency="₺"
-            icon={ClockIcon}
-          />
-          {summary.overdue > 0 && (
-            <SummaryCard
-              title="Overdue"
-              amount={summary.overdue}
-              currency="₺"
-              icon={ExclamationCircleIcon}
-              isNegative
-            />
-          )}
-          <SummaryCard
-            title={viewMode === 'tenant' ? 'Last Payment' : 'Last Transfer'}
-            amount={summary.lastPayment}
-            currency="₺"
-            icon={ArrowDownTrayIcon}
-          />
-        </div>
-
-        {/* Search and Filters */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-          <div className="flex-1 max-w-lg">
-            <div className="relative rounded-lg shadow-sm">
+      {/* Filters and Search */}
+      <div className="mb-6">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+          {/* Search input - left side */}
+          <div className="w-full md:w-auto md:flex-1">
+            <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
               </div>
               <input
                 type="text"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow duration-200"
-                placeholder={`Search ${viewMode === 'tenant' ? 'payments' : 'payouts'}...`}
               />
             </div>
           </div>
-          <div>
+          
+          {/* Filter controls - right side */}
+          <div className="w-full md:w-auto flex flex-col md:flex-row gap-3">
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as PaymentStatus | 'all')}
-              className="block w-full rounded-lg border-gray-300 py-2 pl-3 pr-10 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow duration-200"
+              onChange={(e) => setStatusFilter(e.target.value as PaymentStatus)}
+              className="block w-full md:w-52 px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+              aria-label="Filter by status"
             >
-              <option value="all">All Status</option>
-              <option value="paid">Paid</option>
+              <option value="all">All Statuses</option>
               <option value="pending">Pending</option>
+              <option value="paid">Paid</option>
               <option value="overdue">Overdue</option>
               <option value="upcoming">Upcoming</option>
             </select>
           </div>
         </div>
-
-        {/* Payments/Payouts List */}
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-blue-600 transition ease-in-out duration-150 cursor-not-allowed">
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Loading...
-            </div>
-          </div>
-        ) : filteredPayments.length === 0 ? (
-          <EmptyState viewMode={viewMode} />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredPayments.map((payment) => (
-              <PaymentCard
-                key={payment.id}
-                payment={payment}
-                viewMode={viewMode}
-              />
-            ))}
-          </div>
-        )}
       </div>
-    </div>
+
+      {/* Payments List */}
+      <div className="space-y-4">
+        <PaymentList payments={filteredPayments} viewMode={viewMode} />
+      </div>
+    </Container>
   );
 } 
