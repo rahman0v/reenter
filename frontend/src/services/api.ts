@@ -12,6 +12,7 @@ export interface User {
   bio?: string;
   photo_url?: string;
   profile_photo?: string;
+  avatar?: string;
   role: 'tenant' | 'landlord' | 'admin';
   preferred_name?: string;
   address?: string;
@@ -20,6 +21,7 @@ export interface User {
   employment_status?: string;
   date_of_birth?: string;
   trust_score?: number;
+  trust_badge?: boolean;
   created_at: string;
   updated_at: string;
   verifications?: {
@@ -36,6 +38,7 @@ export interface User {
     facebook: boolean;
   };
   ratings?: {
+    total_reviews?: number;
     as_landlord: {
       average: number;
       count: number;
@@ -44,6 +47,11 @@ export interface User {
       average: number;
       count: number;
     };
+  };
+  subscription?: {
+    plan: string;
+    features?: string[];
+    next_billing_date?: string;
   };
 }
 
@@ -325,52 +333,85 @@ export const authService = {
 // User services
 export const userService = {
   getProfile: async (): Promise<User> => {
-    const response = await api.get<User>('/users/profile');
-    return response.data;
+    const response = await api.get('/users/profile');
+    return response.data as User;
   },
   
   updateProfile: async (profileData: Partial<User>): Promise<User> => {
-    const response = await api.put<User>('/users/profile', profileData);
-    return response.data;
+    const response = await api.put('/users/profile', profileData);
+    return response.data as User;
   },
   
-  uploadProfilePhoto: async (formData: FormData): Promise<User> => {
-    const config = {
+  getPublicProfile: async (userId: number): Promise<User> => {
+    const response = await api.get(`/users/${userId}/public`);
+    return response.data as User;
+  },
+  
+  uploadProfilePhoto: async (formData: FormData): Promise<{ url: string }> => {
+    const response = await api.post('/users/profile/photo', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
-    };
-    const response = await api.post<User>('/users/profile/photo', formData, config);
+    });
     return response.data;
   },
   
-  changePassword: async (data: { currentPassword: string; newPassword: string }): Promise<void> => {
-    const response = await api.post('/users/change-password', data);
+  verifyEmail: async (): Promise<{ message: string }> => {
+    const response = await api.post('/users/verify/email');
+    return response.data;
+  },
+  
+  verifyPhone: async (code: string): Promise<{ message: string }> => {
+    const response = await api.post('/users/verify/phone', { code });
+    return response.data;
+  },
+  
+  verifyID: async (formData: FormData): Promise<{ message: string }> => {
+    const response = await api.post('/users/verify/id', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  },
+  
+  verifyBankAccount: async (accountData: any): Promise<{ message: string }> => {
+    const response = await api.post('/users/verify/bank', accountData);
+    return response.data;
+  },
+  
+  updatePassword: async (passwordData: { currentPassword: string; newPassword: string }): Promise<{ message: string }> => {
+    const response = await api.post('/users/change-password', passwordData);
     return response.data;
   },
   
   getPaymentMethods: async (): Promise<PaymentMethod[]> => {
-    const response = await api.get<PaymentMethod[]>('/users/payment-methods');
-    return response.data;
+    const response = await api.get('/users/payment-methods');
+    return response.data as PaymentMethod[];
   },
   
-  addPaymentMethod: async (data: PaymentMethodCreateData): Promise<PaymentMethod> => {
-    const response = await api.post<PaymentMethod>('/users/payment-methods', data);
-    return response.data;
+  addPaymentMethod: async (paymentMethodData: PaymentMethodCreateData): Promise<PaymentMethod> => {
+    const response = await api.post('/users/payment-methods', paymentMethodData);
+    return response.data as PaymentMethod;
   },
   
-  updatePaymentMethod: async (id: string, data: PaymentMethodUpdateData): Promise<PaymentMethod> => {
-    const response = await api.put<PaymentMethod>(`/users/payment-methods/${id}`, data);
-    return response.data;
+  updatePaymentMethod: async (id: string, updateData: PaymentMethodUpdateData): Promise<PaymentMethod> => {
+    const response = await api.put(`/users/payment-methods/${id}`, updateData);
+    return response.data as PaymentMethod;
   },
   
-  removePaymentMethod: async (id: string): Promise<void> => {
+  setDefaultPaymentMethod: async (id: string): Promise<PaymentMethod> => {
+    const response = await api.patch(`/users/payment-methods/${id}/default`);
+    return response.data as PaymentMethod;
+  },
+  
+  deletePaymentMethod: async (id: string): Promise<{ message: string }> => {
     const response = await api.delete(`/users/payment-methods/${id}`);
     return response.data;
   },
   
-  setDefaultPaymentMethod: async (id: string): Promise<PaymentMethod> => {
-    const response = await api.patch<PaymentMethod>(`/users/payment-methods/${id}/default`);
+  connectSocialAccount: async (platform: string): Promise<{ success: boolean; message: string }> => {
+    const response = await api.post(`/users/connect/${platform}`);
     return response.data;
   },
   
@@ -392,7 +433,7 @@ export const userService = {
   getPotentialTenants: async (): Promise<User[]> => {
     const response = await api.get('/api/users/potential-tenants');
     return response.data;
-  }
+  },
 };
 
 // Lease services
@@ -501,20 +542,60 @@ export const leaseService = {
 // Payment services
 export const paymentService = {
   getAllPayments: async (): Promise<Payment[]> => {
-    const response = await api.get<Payment[]>('/payments');
-    return response.data;
+    console.log("📊 Diagnostics: Fetching all payments...");
+    try {
+      const response = await api.get<Payment[]>('/payments');
+      console.log("📊 Diagnostics: Payments received:", response.data);
+      
+      // Detailed logging of each payment
+      response.data.forEach(payment => {
+        console.log(`📊 Payment ID: ${payment.id}, Amount: ${payment.amount}, Type: ${typeof payment.amount}`);
+        console.log(`   Due Date: ${payment.due_date}, Status: ${payment.status}`);
+        
+        // Calculate if this should be a future payment
+        const dueDate = new Date(payment.due_date);
+        const now = new Date();
+        console.log(`   Is Future Payment: ${dueDate > now}, Due: ${dueDate.toISOString()}, Now: ${now.toISOString()}`);
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error("📊 Diagnostics: Error fetching payments:", error);
+      throw error;
+    }
   },
   getLeasePayments: async (leaseId: number): Promise<Payment[]> => {
-    const response = await api.get<Payment[]>(`/payments/lease/${leaseId}`);
-    return response.data;
+    console.log(`📊 Diagnostics: Fetching payments for lease ${leaseId}...`);
+    try {
+      const response = await api.get<Payment[]>(`/payments/lease/${leaseId}`);
+      console.log(`📊 Diagnostics: Payments for lease ${leaseId} received:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`📊 Diagnostics: Error fetching payments for lease ${leaseId}:`, error);
+      throw error;
+    }
   },
   createPayment: async (paymentData: PaymentData): Promise<Payment> => {
-    const response = await api.post<Payment>('/payments', paymentData);
-    return response.data;
+    console.log("📊 Diagnostics: Creating payment:", paymentData);
+    try {
+      const response = await api.post<Payment>('/payments', paymentData);
+      console.log("📊 Diagnostics: Payment created:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("📊 Diagnostics: Error creating payment:", error);
+      throw error;
+    }
   },
   updatePaymentStatus: async (id: number, status: Payment['status']): Promise<Payment> => {
-    const response = await api.put<Payment>(`/payments/${id}/status`, { status });
-    return response.data;
+    console.log(`📊 Diagnostics: Updating payment ${id} status to ${status}...`);
+    try {
+      const response = await api.put<Payment>(`/payments/${id}/status`, { status });
+      console.log(`📊 Diagnostics: Payment ${id} status updated:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`📊 Diagnostics: Error updating payment ${id} status:`, error);
+      throw error;
+    }
   },
 };
 
@@ -558,6 +639,211 @@ export const propertyService = {
   
   deleteProperty: async (id: number): Promise<void> => {
     await api.delete(`/api/properties/${id}`);
+  }
+};
+
+// Debug Utilities for Application Diagnostics
+export const DiagnosticsUtil = {
+  analyzePaymentData: (payment: Payment): void => {
+    console.group(`🔍 Payment Analysis: ID ${payment.id}`);
+    
+    // Check payment data types
+    console.log('Amount:', {
+      value: payment.amount,
+      type: typeof payment.amount,
+      isNumeric: !isNaN(Number(payment.amount))
+    });
+    
+    // Analyze dates
+    try {
+      const dueDate = new Date(payment.due_date);
+      const now = new Date();
+      console.log('Date Analysis:', {
+        original: payment.due_date,
+        parsed: dueDate.toISOString(),
+        valid: !isNaN(dueDate.getTime()),
+        isFuture: dueDate > now,
+        timeDifference: dueDate.getTime() - now.getTime(),
+        daysFromNow: Math.round((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      });
+    } catch (error) {
+      console.error('Date Parsing Error:', error);
+    }
+    
+    // Analyze status
+    console.log('Status:', {
+      value: payment.status,
+      isPending: payment.status === 'pending',
+      isPaid: payment.status === 'paid'
+    });
+    
+    // Lease relationship
+    console.log('Lease:', {
+      id: payment.lease_id,
+      propertyName: payment.property_name || 'Not loaded',
+      currency: payment.currency || 'Not specified'
+    });
+    
+    console.groupEnd();
+  },
+  
+  analyzeLeaseData: (lease: Lease): void => {
+    console.group(`🔍 Lease Analysis: ID ${lease.id}`);
+    
+    // Basic lease info
+    console.log('Basic Info:', {
+      refCode: lease.ref_code,
+      status: lease.status,
+      property: lease.property_name
+    });
+    
+    // Check payment structure
+    const monthlyRent = typeof lease.monthly_rent === 'string'
+      ? parseFloat(lease.monthly_rent)
+      : lease.monthly_rent;
+      
+    const premium = typeof lease.premium === 'string'
+      ? parseFloat(lease.premium)
+      : lease.premium;
+    
+    const expectedPremium = monthlyRent * 0.085;
+    
+    console.log('Payment Structure:', {
+      monthlyRent: {
+        value: monthlyRent,
+        type: typeof lease.monthly_rent
+      },
+      premium: {
+        value: premium,
+        type: typeof lease.premium
+      },
+      expectedPremium: expectedPremium,
+      premiumDiscrepancy: premium - expectedPremium,
+      totalPayment: monthlyRent + premium,
+      expectedTotal: monthlyRent + expectedPremium,
+      currency: lease.currency
+    });
+    
+    // Date analysis
+    try {
+      const startDate = new Date(lease.start_date);
+      const endDate = new Date(lease.end_date);
+      const now = new Date();
+      
+      console.log('Date Analysis:', {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        durationMonths: Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30)),
+        isActive: startDate <= now && endDate >= now
+      });
+    } catch (error) {
+      console.error('Date Parsing Error:', error);
+    }
+    
+    console.groupEnd();
+  },
+  
+  analyzeDashboardData: (payments: Payment[], leases: Lease[]): void => {
+    console.group('🧪 Dashboard Data Analysis');
+    
+    // Payment statistics
+    const pendingPayments = payments.filter(p => p.status === 'pending');
+    const futurePayments = payments.filter(p => {
+      try {
+        return new Date(p.due_date) > new Date();
+      } catch (e) {
+        return false;
+      }
+    });
+    
+    console.log('Payment Statistics:', {
+      total: payments.length,
+      pending: pendingPayments.length,
+      future: futurePayments.length,
+      futurePending: futurePayments.filter(p => p.status === 'pending').length
+    });
+    
+    // Check for April 2025 payments specifically
+    const april2025Payments = payments.filter(p => {
+      try {
+        const date = new Date(p.due_date);
+        return date.getMonth() === 3 && date.getFullYear() === 2025;
+      } catch (e) {
+        return false;
+      }
+    });
+    
+    console.log('April 2025 Payments:', april2025Payments);
+    
+    // Monthly data distribution
+    const paymentsByMonth = Array(12).fill(0).map(() => ({
+      past: 0,
+      future: 0,
+      count: 0
+    }));
+    
+    payments.forEach(payment => {
+      try {
+        const date = new Date(payment.due_date);
+        const month = date.getMonth();
+        const isFuture = date > new Date();
+        
+        paymentsByMonth[month].count++;
+        
+        if (isFuture && payment.status === 'pending') {
+          paymentsByMonth[month].future += Number(payment.amount);
+        } else {
+          paymentsByMonth[month].past += Number(payment.amount);
+        }
+      } catch (e) {
+        console.error('Error processing payment for monthly distribution:', e);
+      }
+    });
+    
+    console.log('Monthly Distribution:', paymentsByMonth);
+    
+    console.groupEnd();
+  }
+};
+
+// Add rating service
+export const ratingService = {
+  getUserRatings: async (userId: number): Promise<any> => {
+    const response = await api.get(`/api/ratings/user/${userId}`);
+    return response.data;
+  },
+  
+  getLeaseRatings: async (leaseId: number): Promise<any> => {
+    const response = await api.get(`/api/ratings/lease/${leaseId}`);
+    return response.data;
+  },
+  
+  getRating: async (id: number): Promise<any> => {
+    const response = await api.get(`/api/ratings/${id}`);
+    return response.data;
+  },
+  
+  createRating: async (ratingData: {
+    reviewed_id: number;
+    lease_id: number;
+    rating: number;
+    comment?: string;
+    role: 'landlord' | 'tenant';
+  }): Promise<any> => {
+    const response = await api.post('/api/ratings', ratingData);
+    return response.data;
+  },
+  
+  updateRating: async (id: number, updateData: {
+    rating?: number;
+    comment?: string;
+  }): Promise<any> => {
+    const response = await api.put(`/api/ratings/${id}`, updateData);
+    return response.data;
+  },
+  
+  deleteRating: async (id: number): Promise<void> => {
+    await api.delete(`/api/ratings/${id}`);
   }
 };
 

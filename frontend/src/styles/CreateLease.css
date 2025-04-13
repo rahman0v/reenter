@@ -1,0 +1,118 @@
+/* Reset all default input styles */
+.form-input,
+.form-select,
+.form-textarea,
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="date"],
+input[type="tel"],
+select,
+textarea {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 100% !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid #E5E7EB !important;
+  padding: 1rem 0 !important;
+  font-size: 1.125rem !important;
+  color: #111827 !important;
+  transition: all 0.3s ease !important;
+  margin-top: 0.25rem !important;
+}
+
+/* Focus states */
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus,
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="tel"]:focus,
+select:focus,
+textarea:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+  border-bottom: 2px solid #10B981 !important;
+  --tw-ring-color: transparent !important;
+  --tw-ring-offset-width: 0 !important;
+  --tw-ring-offset-color: transparent !important;
+  --tw-ring-width: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* Remove browser default styles */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px white inset !important;
+  -webkit-text-fill-color: #111827 !important;
+  border-width: 0 0 1px 0 !important;
+}
+
+/* Style select dropdowns */
+select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e") !important;
+  background-position: right 0 center !important;
+  background-repeat: no-repeat !important;
+  background-size: 1.5em 1.5em !important;
+  padding-right: 2.5em !important;
+}
+
+/* Remove default number input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield !important;
+}
+
+/* Style labels */
+.form-label {
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  color: #374151 !important;
+  margin-bottom: 0.25rem !important;
+  display: block !important;
+}
+
+/* Form group spacing */
+.form-group {
+  margin-bottom: 1.25rem !important;
+  width: 100% !important;
+}
+
+/* Container styles */
+.form-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 0 !important;
+}
+
+/* Style the rent input wrapper */
+.rent-input-wrapper {
+  position: relative !important;
+  width: 100% !important;
+}
+
+.rent-input-wrapper input {
+  padding-right: 3rem !important;
+}
+
+.currency-indicator {
+  position: absolute !important;
+  right: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  color: #6B7280 !important;
+  pointer-events: none !important;
+} 

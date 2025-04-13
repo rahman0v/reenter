@@ -69,6 +69,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/leases', require('./routes/leases'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/ratings', require('./routes/ratings'));
 
 // Serve static files from frontend/dist in production
 if (isProduction) {

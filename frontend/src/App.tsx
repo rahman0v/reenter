@@ -19,7 +19,6 @@ import CreateLease from './pages/CreateLease';
 import Payments from './pages/Payments';
 import Settings from './pages/Settings';
 import Messages from './pages/Messages';
-import Notifications from './pages/Notifications';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 // Import pages
@@ -28,21 +27,24 @@ import Career from './pages/Career';
 import Legal from './pages/Legal';
 import HowItWorks from './components/HowItWorks';
 import CookieConsent from './components/CookieConsent';
+import ReviewsPage from './pages/ReviewsPage';
+import PublicProfile from './pages/PublicProfile';
 
 export default function App() {
   return (
     <AuthProvider>
       <Router>
         <ScrollToTop />
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-gray-50">
           <Header />
-          <main>
+          <main className="pt-16">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/company" element={<Company />} />
               <Route path="/features" element={<Features />} />
               <Route path="/plans" element={<Plans />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/partners" element={<Partners />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
@@ -61,10 +63,12 @@ export default function App() {
               <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-              <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+              <Route path="/profile/reviews" element={<ReviewsPage />} />
+              <Route path="/profile/reviews/:userId" element={<ReviewsPage />} />
+              <Route path="/users/:userId" element={<ProtectedRoute><PublicProfile /></ProtectedRoute>} />
               
               {/* Catch all route - redirect to home */}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </main>
           <Footer />

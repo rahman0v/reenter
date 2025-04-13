@@ -179,10 +179,10 @@ export default function Signup() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onBlur={() => handleBlur('name')}
-                className={`appearance-none relative block w-full px-3 py-2 border ${
-                  formTouched.name && !name ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
-                placeholder="John Doe"
+                className={`appearance-none relative block w-full px-3 py-1.5 border-b ${
+                  formTouched.name && !name ? 'border-red-300' : 'border-gray-200'
+                } placeholder-gray-500 text-gray-900 focus:outline-none focus:border-primary focus:z-10 sm:text-sm`}
+                placeholder="Full name"
               />
               {formTouched.name && !name && (
                 <p className="mt-1 text-xs text-red-600">Full name is required</p>
@@ -202,10 +202,10 @@ export default function Signup() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={() => handleBlur('email')}
-                className={`appearance-none relative block w-full px-3 py-2 border ${
-                  formTouched.email && (!email || !isEmailValid) ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
-                placeholder="you@example.com"
+                className={`appearance-none relative block w-full px-3 py-1.5 border-b ${
+                  formTouched.email && (!email || !isEmailValid) ? 'border-red-300' : 'border-gray-200'
+                } placeholder-gray-500 text-gray-900 focus:outline-none focus:border-primary focus:z-10 sm:text-sm`}
+                placeholder="Email address"
               />
               {formTouched.email && !email && (
                 <p className="mt-1 text-xs text-red-600">Email address is required</p>
@@ -228,9 +228,9 @@ export default function Signup() {
                 value={phone}
                 onChange={handlePhoneChange}
                 onBlur={() => handleBlur('phone')}
-                className={`appearance-none relative block w-full px-3 py-2 border ${
-                  formTouched.phone && (!phone || !isPhoneValid) ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
+                className={`appearance-none relative block w-full px-3 py-1.5 border-b ${
+                  formTouched.phone && (!phone || !isPhoneValid) ? 'border-red-300' : 'border-gray-200'
+                } placeholder-gray-500 text-gray-900 focus:outline-none focus:border-primary focus:z-10 sm:text-sm`}
                 placeholder="e.g., 5551234567"
               />
               {formTouched.phone && !phone && (
@@ -256,10 +256,10 @@ export default function Signup() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onBlur={() => handleBlur('password')}
-                  className={`appearance-none relative block w-full px-3 py-2 border ${
-                    formTouched.password && (!password || !isPasswordStrong) ? 'border-red-300' : 'border-gray-300'
-                  } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
-                  placeholder="••••••••"
+                  className={`appearance-none relative block w-full px-3 py-1.5 border-b ${
+                    formTouched.password && !password ? 'border-red-300' : 'border-gray-200'
+                  } placeholder-gray-500 text-gray-900 focus:outline-none focus:border-primary focus:z-10 sm:text-sm pr-10`}
+                  placeholder="Password"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                   <button
@@ -313,10 +313,10 @@ export default function Signup() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   onBlur={() => handleBlur('confirmPassword')}
-                  className={`appearance-none relative block w-full px-3 py-2 border ${
-                    formTouched.confirmPassword && (!confirmPassword || !doPasswordsMatch) ? 'border-red-300' : 'border-gray-300'
-                  } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`}
-                  placeholder="••••••••"
+                  className={`appearance-none relative block w-full px-3 py-1.5 border-b ${
+                    formTouched.confirmPassword && (!confirmPassword || !doPasswordsMatch) ? 'border-red-300' : 'border-gray-200'
+                  } placeholder-gray-500 text-gray-900 focus:outline-none focus:border-primary focus:z-10 sm:text-sm pr-10`}
+                  placeholder="Confirm password"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                   <button

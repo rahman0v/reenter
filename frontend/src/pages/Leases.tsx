@@ -20,10 +20,15 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon,
   ExclamationCircleIcon,
+  HomeIcon,
+  ArrowPathIcon,
+  DocumentIcon,
+  UserPlusIcon,
 } from '@heroicons/react/24/outline';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import { LeaseData, LeaseStatus, Currency } from '../services/api';
+import Container from '../components/Container';
 
 // Types and Interfaces
 type UserRole = 'all' | 'landlord' | 'tenant';
@@ -32,15 +37,15 @@ interface NewLeaseForm {
   property_name: string;
   property_address: string;
   monthly_rent: number;
-  currency: Currency;
+  currency: string;
   start_date: string;
   end_date: string;
-  template_data?: {
-    additional_terms?: string;
-    utilities_included?: string[];
-    pets_allowed?: boolean;
-    smoking_allowed?: boolean;
-    notice_period_days?: number;
+  template_data: {
+    additional_terms: string;
+    utilities_included: string[];
+    pets_allowed: boolean;
+    smoking_allowed: boolean;
+    notice_period_days: number;
     [key: string]: any;
   };
 }
@@ -152,8 +157,8 @@ const StatusBadge = ({ status }: { status: LeaseStatus }) => {
       label = 'Changes Requested';
       break;
     case 'active':
-      bgColor = 'bg-green-100';
-      color = 'text-green-800';
+      bgColor = 'bg-emerald-100';
+      color = 'text-emerald-800';
       label = 'Active';
       break;
     case 'completed':
@@ -178,39 +183,62 @@ const StatusBadge = ({ status }: { status: LeaseStatus }) => {
   }
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${bgColor} ${color} shadow-sm`}>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${bgColor} ${color} shadow-sm`}>
       {label}
     </span>
   );
 };
 
-const EmptyState = ({ role, onAction }: { role: UserRole, onAction: () => void }) => {
-  return (
-    <div className="text-center bg-white shadow-sm rounded-lg border border-gray-200 px-6 py-12">
-      <BuildingOfficeIcon className="mx-auto h-12 w-12 text-gray-400" />
-      <h3 className="mt-2 text-lg font-medium text-gray-900">No leases found</h3>
-      <p className="mt-1 text-sm text-gray-500">
-        {role === 'all'
-          ? "You don't have any leases yet."
-          : role === 'landlord'
-          ? "You haven't created any leases as a landlord yet."
-          : "You don't have any active leases as a tenant."}
+const EmptyState = ({ onCreateLease, onJoinLease, isFiltered }: { onCreateLease: () => void, onJoinLease: () => void, isFiltered: boolean }) => (
+  <div className="flex flex-col items-center justify-center p-10 bg-white rounded-xl shadow-sm border border-gray-100">
+    <div className="text-center mb-6">
+      <DocumentIcon className="mx-auto h-16 w-16 text-gray-300" />
+      <h3 className="mt-4 text-lg font-medium text-gray-900">
+        {isFiltered ? 'No matching leases found' : 'No leases yet'}
+      </h3>
+    <p className="mt-1 text-sm text-gray-500">
+        {isFiltered 
+          ? 'Try adjusting your search or filters to find what you\'re looking for.' 
+          : 'Get started by creating a new lease or joining an existing one.'}
       </p>
-      {role !== 'all' && (
-        <div className="mt-6">
-          <button
-            type="button"
-            onClick={onAction}
-            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-            {role === 'tenant' ? 'Join a Lease' : 'New Lease'}
-          </button>
-        </div>
-      )}
     </div>
-  );
-};
+    
+    {!isFiltered && (
+      <div className="flex flex-wrap gap-4 justify-center">
+        <button
+          onClick={onCreateLease}
+          type="button"
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+        >
+          <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+          Create New Lease
+        </button>
+        <button
+          onClick={onJoinLease}
+          type="button"
+          className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+        >
+          <UserPlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+          Join Existing Lease
+        </button>
+      </div>
+    )}
+    
+    {isFiltered && (
+      <button
+        onClick={() => {
+          // Reset all filters
+          window.location.reload();
+        }}
+        type="button"
+        className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+      >
+        <ArrowPathIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+        Reset Filters
+      </button>
+    )}
+  </div>
+);
 
 interface LeaseCardProps {
   lease: Lease;
@@ -225,6 +253,32 @@ const LeaseCard = ({ lease, userRole }: LeaseCardProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  
+  // Get border color based on status for visual indication
+  const getBorderColor = (status: LeaseStatus) => {
+    switch (status) {
+      case 'active':
+        return 'border-emerald-400';
+      case 'draft':
+        return 'border-gray-300';
+      case 'pending':
+        return 'border-blue-400';
+      case 'awaiting_landlord_signature':
+        return 'border-purple-400';
+      case 'awaiting_tenant_signature':
+        return 'border-indigo-400';
+      case 'changes_requested':
+        return 'border-yellow-400';
+      case 'terminated':
+        return 'border-red-400';
+      case 'completed':
+        return 'border-teal-400';
+      case 'cancelled':
+        return 'border-gray-400';
+      default:
+        return 'border-gray-200';
+    }
+  };
   
   const formatCurrency = (amount: number, currency: Currency) => {
     const formatter = new Intl.NumberFormat('en-US', {
@@ -285,151 +339,73 @@ const LeaseCard = ({ lease, userRole }: LeaseCardProps) => {
   
   // Check if the current user is the landlord who created this lease
   const isCreator = currentUser?.id === lease.landlord_id;
-  
+
   return (
-    <div className="bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200">
-      {/* Card Header with Property Name and Status Badge */}
-      <div className="p-5">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-lg font-medium text-gray-900 flex items-center truncate">
-            <BuildingOfficeIcon className="h-5 w-5 text-gray-500 mr-2 flex-shrink-0" />
-            <span className="truncate">{lease.property_name}</span>
-          </h3>
+    <div className={`bg-white rounded-xl shadow-sm overflow-hidden border ${getBorderColor(lease.status)}`}>
+      <div className="p-6">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 truncate">
+              {lease.property_name}
+            </h3>
+            <p className="text-sm text-gray-500">
+              {lease.property_address.slice(0, 30) + (lease.property_address.length > 30 ? '...' : '')}
+            </p>
+          </div>
           <StatusBadge status={lease.status} />
         </div>
-        <p className="text-sm text-gray-500 mb-3">{lease.property_address}</p>
-        
-        {/* Reference Code - Small and subtle */}
-        <div className="mb-4">
-          <span className="text-xs text-gray-400">{lease.ref_code}</span>
+
+        <div className="flex flex-col space-y-2 mb-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-xs text-gray-500 uppercase font-medium mb-1">Landlord</p>
+              <p className="text-sm font-medium truncate">{lease.landlord_name}</p>
+              {userRole === 'tenant' && lease.landlord_id !== currentUser?.id && (
+                <Link 
+                  to={`/users/${lease.landlord_id}`}
+                  className="mt-2 inline-flex items-center text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-md transition-all"
+                >
+                  <UserIcon className="mr-1 h-3 w-3" aria-hidden="true" />
+                  View Profile
+                </Link>
+              )}
+          </div>
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-xs text-gray-500 uppercase font-medium mb-1">Tenant</p>
+              <p className="text-sm font-medium truncate">{lease.tenant_name}</p>
+              {userRole === 'landlord' && lease.tenant_id !== currentUser?.id && (
+                <Link 
+                  to={`/users/${lease.tenant_id}`}
+                  className="mt-2 inline-flex items-center text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-md transition-all"
+                >
+                  <UserIcon className="mr-1 h-3 w-3" aria-hidden="true" />
+                  View Profile
+                </Link>
+              )}
+          </div>
+          </div>
+          </div>
+
+        <div className="flex flex-col space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Monthly Rent:</span>
+            <span className="font-medium">{formatCurrency(lease.monthly_rent, lease.currency)}</span>
+              </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Lease Period:</span>
+            <span className="font-medium">{formatDate(lease.start_date)} - {formatDate(lease.end_date)}</span>
+              </div>
         </div>
         
-        {/* Key Information Section */}
-        <div className="space-y-3 mb-5">
-          {/* Lease Period */}
-          <div className="flex items-center text-sm">
-            <CalendarIcon className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
-            <span className="text-gray-600">{formatDate(lease.start_date)} - {formatDate(lease.end_date)}</span>
-          </div>
-          
-          {/* Person Info (Tenant or Landlord) */}
-          <div className="flex items-center text-sm">
-            <UserIcon className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
-            <span className="text-gray-600">
-              {userRole === 'landlord' 
-                ? <>Tenant: <span className="font-medium">{lease.tenant_name || 'No tenant yet'}</span></>
-                : <>Landlord: <span className="font-medium">{lease.landlord_name}</span></>
-              }
-            </span>
-          </div>
-          
-          {/* Rent Amount */}
-          <div className="flex items-center text-sm">
-            <BanknotesIcon className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
-            <span className="font-medium text-gray-800">
-              {formatCurrency(lease.monthly_rent, lease.currency)}/month
-            </span>
-          </div>
-        </div>
-        
-        {/* Action Buttons */}
-        <div className="flex justify-end space-x-3 mt-4">
-          {/* Only show delete button if user is the creator (landlord) and we're in the landlord section */}
-          {isCreator && userRole === 'landlord' && (
-            <button
-              type="button"
-              onClick={handleDeleteClick}
-              disabled={isDeleting}
-              className="inline-flex items-center px-3 py-1.5 border border-red-300 shadow-sm text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500"
-            >
-              {isDeleting ? 'Deleting...' : 'Delete'}
-            </button>
-          )}
+        <div className="mt-6">
           <button
-            type="button"
             onClick={viewDetails}
-            className="inline-flex items-center px-4 py-1.5 border border-transparent shadow-sm text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full px-4 py-2 bg-emerald-50 text-emerald-700 font-medium text-sm rounded-lg hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors duration-200"
           >
             View Details
           </button>
         </div>
       </div>
-      
-      {deleteError && (
-        <div className="px-4 py-2 bg-red-50 text-sm text-red-700 border-t border-red-200">
-          {deleteError}
-        </div>
-      )}
-      
-      {/* Delete Confirmation Modal */}
-      <Transition.Root show={showDeleteConfirm} as={Fragment}>
-        <Dialog as="div" className="fixed z-10 inset-0 overflow-y-auto" onClose={handleDeleteCancel}>
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0"
-              enterTo="opacity-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-            >
-              <Dialog.Overlay className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
-            </Transition.Child>
-
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">
-              &#8203;
-            </span>
-            
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-              enterTo="opacity-100 translate-y-0 sm:scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
-              leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-            >
-              <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <div className="sm:flex sm:items-start">
-                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                      <ExclamationTriangleIcon className="h-6 w-6 text-red-600" aria-hidden="true" />
-                    </div>
-                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                      <Dialog.Title as="h3" className="text-lg leading-6 font-medium text-gray-900">
-                        Delete Lease
-                      </Dialog.Title>
-                      <div className="mt-2">
-                        <p className="text-sm text-gray-500">
-                          Are you sure you want to delete this lease? This action cannot be undone.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                  <button
-                    type="button"
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
-                    onClick={handleDeleteConfirm}
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? 'Deleting...' : 'Delete'}
-                  </button>
-                  <button
-                    type="button"
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                    onClick={handleDeleteCancel}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </Transition.Child>
-          </div>
-        </Dialog>
-      </Transition.Root>
     </div>
   );
 };
@@ -437,50 +413,40 @@ const LeaseCard = ({ lease, userRole }: LeaseCardProps) => {
 // Tabs component
 const LeaseTabs = ({ activeTab, setActiveTab, leaseCount }: { activeTab: UserRole, setActiveTab: (tab: UserRole) => void, leaseCount: { all: number, landlord: number, tenant: number } }) => {
   return (
-    <div className="flex justify-start mb-6">
-      <div className="inline-flex bg-blue-50 rounded-full p-1">
-        <button
-          onClick={() => setActiveTab('all')}
-          className={`flex items-center px-4 py-2 rounded-full text-sm ${
-            activeTab === 'all'
-              ? 'bg-blue-600 text-white font-medium'
-              : 'text-gray-700 hover:text-gray-900'
-          }`}
-        >
-          All Leases
-          <span className={`ml-2 py-0.5 px-2 text-xs rounded-full ${activeTab === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
-            {leaseCount.all}
-          </span>
-        </button>
-        
-        <button
-          onClick={() => setActiveTab('landlord')}
-          className={`flex items-center px-4 py-2 rounded-full text-sm ${
-            activeTab === 'landlord'
-              ? 'bg-blue-600 text-white font-medium'
-              : 'text-gray-700 hover:text-gray-900'
-          }`}
-        >
-          As Landlord
-          <span className={`ml-2 py-0.5 px-2 text-xs rounded-full ${activeTab === 'landlord' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
-            {leaseCount.landlord}
-          </span>
-        </button>
-        
-        <button
-          onClick={() => setActiveTab('tenant')}
-          className={`flex items-center px-4 py-2 rounded-full text-sm ${
-            activeTab === 'tenant'
-              ? 'bg-blue-600 text-white font-medium'
-              : 'text-gray-700 hover:text-gray-900'
-          }`}
-        >
-          As Tenant
-          <span className={`ml-2 py-0.5 px-2 text-xs rounded-full ${activeTab === 'tenant' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
-            {leaseCount.tenant}
-          </span>
-        </button>
-      </div>
+    <div className="flex space-x-4">
+      <button
+        onClick={() => setActiveTab('all')}
+        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
+          activeTab === 'all'
+            ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg'
+            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+        }`}
+      >
+        <HomeIcon className="h-5 w-5 inline-block mr-2" />
+        All Leases ({leaseCount.all})
+      </button>
+      <button
+        onClick={() => setActiveTab('landlord')}
+        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
+          activeTab === 'landlord'
+            ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg'
+            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+        }`}
+      >
+        <BuildingOfficeIcon className="h-5 w-5 inline-block mr-2" />
+        As Landlord ({leaseCount.landlord})
+      </button>
+                    <button
+        onClick={() => setActiveTab('tenant')}
+        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
+          activeTab === 'tenant'
+            ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg'
+            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+        }`}
+      >
+        <UserIcon className="h-5 w-5 inline-block mr-2" />
+        As Tenant ({leaseCount.tenant})
+                    </button>
     </div>
   );
 };
@@ -553,113 +519,35 @@ const Leases = () => {
     }
   };
 
-  const handleCreateLease = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateLease = async (formData: NewLeaseForm) => {
     try {
-      setError(null);
-      setIsCreating(true);
-      
-      // Validate dates
-      const startDate = new Date(newLeaseForm.start_date);
-      const endDate = new Date(newLeaseForm.end_date);
-      
-      if (endDate <= startDate) {
-        setError('End date must be after start date');
-        setIsCreating(false);
-        return;
-      }
-      
-      // Ensure dates are in ISO8601 format and monthly_rent is a number
-      const formattedData: LeaseData = {
-        ...newLeaseForm,
-        monthly_rent: Number(newLeaseForm.monthly_rent),
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
-        template_data: newLeaseForm.template_data || {
-          additional_terms: '',
-          utilities_included: [],
-          pets_allowed: false,
-          smoking_allowed: false,
-          notice_period_days: 30
-        }
+      setIsLoading(true);
+      const leaseData: LeaseData = {
+        ...formData,
+        monthly_rent: Number(formData.monthly_rent),
+        currency: formData.currency as Currency,
+        template_data: formData.template_data
       };
-      
-      console.log('Submitting lease data:', formattedData);
-      const newLease = await leaseService.createLease(formattedData);
-      setLeases(prev => [newLease, ...prev]);
+      await leaseService.createLease(leaseData);
       setShowNewLeaseModal(false);
-      setNewLeaseForm({
-        property_name: '',
-        property_address: '',
-        monthly_rent: 0,
-        currency: 'USD',
-        start_date: '',
-        end_date: '',
-        template_data: {
-          additional_terms: '',
-          utilities_included: [],
-          pets_allowed: false,
-          smoking_allowed: false,
-          notice_period_days: 30
-        }
-      });
-    } catch (err: any) {
-      console.error('Error creating lease:', err);
-      if (err.response && err.response.data && err.response.data.errors) {
-        const errorMessages = err.response.data.errors.map((e: any) => e.msg).join(', ');
-        setError(`Failed to create lease: ${errorMessages}`);
-      } else if (err.response && err.response.data && err.response.data.message) {
-        setError(`Failed to create lease: ${err.response.data.message}`);
-      } else {
+      fetchLeases();
+    } catch (error) {
         setError('Failed to create lease. Please try again.');
-      }
     } finally {
-      setIsCreating(false);
+      setIsLoading(false);
     }
   };
 
-  const handleJoinLease = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleJoinLease = async (formData: JoinLeaseForm) => {
     try {
-      setJoinError(null);
-      setIsJoining(true);
-      
-      if (!joinLeaseForm.lease_id.trim()) {
-        setJoinError('Please enter a valid lease ID');
-        setIsJoining(false);
-        return;
-      }
-      
-      const joinedLease = await leaseService.joinLease(joinLeaseForm.lease_id);
-      
-      // Update local state
-      setLeases(prev => [joinedLease, ...prev]);
+      setIsLoading(true);
+      await leaseService.joinLease(formData.lease_id);
       setShowJoinLeaseModal(false);
-      setJoinLeaseForm({
-        lease_id: '',
-        template_data: {
-          additional_terms: '',
-          utilities_included: [],
-          pets_allowed: false,
-          smoking_allowed: false,
-          notice_period_days: 30
-        }
-      });
-      
-      // Refresh leases data from server to ensure complete sync
       fetchLeases();
-    } catch (err: any) {
-      console.error('Error joining lease:', err);
-      if (err.response && err.response.data && err.response.data.errors) {
-        const errorMessages = err.response.data.errors.map((e: any) => e.msg).join(', ');
-        setJoinError(`Failed to join lease: ${errorMessages}`);
-      } else if (err.response && err.response.data && err.response.data.message) {
-        setJoinError(`Failed to join lease: ${err.response.data.message}`);
-      } else {
-        setJoinError('Failed to join lease. Please check the lease ID and try again.');
-      }
+    } catch (error) {
+      setError('Failed to join lease. Please try again.');
     } finally {
-      setIsJoining(false);
+      setIsLoading(false);
     }
   };
 
@@ -698,324 +586,584 @@ const Leases = () => {
     }
   };
 
-  return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto px-4 py-8 pt-24 max-w-6xl">
-        {/* Page header with description */}
+  // Add search and filter controls
+  const searchAndFilterSection = (
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Leases & Rentals</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage your rental agreements and lease contracts</p>
+      <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+        {/* Search input - left side */}
+        <div className="w-full md:w-auto md:flex-1">
+          <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+              aria-label="Search leases"
+              />
+            </div>
+          </div>
+        
+        {/* Filter and Sort - right side */}
+        <div className="w-full md:w-auto flex flex-col md:flex-row gap-3">
+          {/* Status filter */}
+            <select
+            id="status-filter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as LeaseStatus | 'all')}
+            className="block w-full md:w-52 px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+            aria-label="Filter by status"
+          >
+            <option value="all">All Statuses</option>
+            <option value="draft">Draft</option>
+            <option value="pending">Pending Review</option>
+            <option value="awaiting_landlord_signature">Awaiting Landlord</option>
+            <option value="awaiting_tenant_signature">Awaiting Tenant</option>
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+            <option value="terminated">Terminated</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          
+          {/* Sort order */}
+            <button
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="flex items-center justify-between w-full md:w-40 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
+            aria-label={sortOrder === 'asc' ? 'Sort newest first' : 'Sort oldest first'}
+            >
+            <span>{sortOrder === 'asc' ? 'Oldest' : 'Newest'}</span>
+            <ArrowPathIcon className={`h-5 w-5 text-gray-500 ${sortOrder === 'asc' ? 'rotate-0' : 'rotate-180'} transition-transform`} />
+            </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Add navigation to comprehensive form
+  const navigateToComprehensiveForm = () => {
+    navigate('/leases/create');
+  };
+
+  return (
+    <Container>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Leases & Rentals</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Manage your leases and rental agreements
+        </p>
+      </div>
+
+      <div className="flex flex-wrap justify-between items-center mb-6">
+        <div className="mb-4 md:mb-0">
+          <LeaseTabs
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            leaseCount={leaseCount}
+          />
+        </div>
+        
+        <div className="flex space-x-4">
+                <button
+            onClick={navigateToComprehensiveForm}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transform hover:scale-105 transition-all duration-200"
+                >
+                  <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
+            Create New Lease
+                </button>
+                <button
+            onClick={() => setShowJoinLeaseModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transform hover:scale-105 transition-all duration-200"
+                >
+            <UserIcon className="-ml-1 mr-2 h-5 w-5" />
+            Join Lease
+                </button>
+          </div>
         </div>
 
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center">
-            <ExclamationCircleIcon className="h-5 w-5 mr-2" />
-            <span>{error}</span>
+      {/* Add search and filter section */}
+      {searchAndFilterSection}
+
+      {/* Show loading state, error state, or lease list */}
+        {isLoading ? (
+        <div className="flex justify-center items-center p-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
+        </div>
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
+          <div className="flex">
+            <ExclamationCircleIcon className="h-5 w-5 text-red-400 mr-3 flex-shrink-0" />
+            <h3 className="text-sm font-medium text-red-800">{error}</h3>
+            </div>
+          </div>
+        ) : filteredLeases.length === 0 ? (
+        <EmptyState
+          onCreateLease={() => setShowNewLeaseModal(true)}
+          onJoinLease={() => setShowJoinLeaseModal(true)}
+          isFiltered={searchQuery !== '' || statusFilter !== 'all'}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredLeases.map((lease) => (
+              <LeaseCard
+                key={lease.id}
+                lease={lease}
+                userRole={lease.landlord_id === currentUser?.id ? 'landlord' : 'tenant'}
+              />
+            ))}
           </div>
         )}
 
-        {/* Tab navigation */}
-        <LeaseTabs 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          leaseCount={leaseCount}
+      {/* Modals */}
+      <Modal
+        isOpen={showNewLeaseModal}
+        onClose={() => setShowNewLeaseModal(false)}
+        title="Create New Lease"
+      >
+        <NewLeaseForm
+          onSubmit={handleCreateLease}
+          onCancel={() => setShowNewLeaseModal(false)}
         />
+      </Modal>
 
-        {/* Search and filter row with action buttons */}
-        <div className="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-lg shadow-sm">
-          <div className="relative w-full sm:w-auto flex-grow max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search leases by property, tenant, or landlord..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+      <Modal
+        isOpen={showJoinLeaseModal}
+        onClose={() => setShowJoinLeaseModal(false)}
+        title="Join a Lease"
+      >
+        <JoinLeaseForm
+          onSubmit={handleJoinLease}
+          onCancel={() => setShowJoinLeaseModal(false)}
+        />
+      </Modal>
+    </Container>
+  );
+};
+
+interface FormErrors {
+  property_name?: string;
+  property_address?: string;
+  monthly_rent?: string;
+  currency?: string;
+  start_date?: string;
+  end_date?: string;
+  lease_id?: string;
+}
+
+const NewLeaseForm: React.FC<{ onSubmit: (formData: NewLeaseForm) => void, onCancel: () => void }> = ({ onSubmit, onCancel }) => {
+  const [formData, setFormData] = useState<NewLeaseForm>({
+    property_name: '',
+    property_address: '',
+    monthly_rent: 0,
+    currency: 'USD',
+    start_date: '',
+    end_date: '',
+    template_data: {
+      additional_terms: '',
+      utilities_included: [],
+      pets_allowed: false,
+      smoking_allowed: false,
+      notice_period_days: 30
+    }
+  });
+
+  const [errors, setErrors] = useState<FormErrors>({});
+
+  const validateForm = () => {
+    const newErrors: FormErrors = {};
+    
+    if (!formData.property_name.trim()) {
+      newErrors.property_name = 'Property name is required';
+    }
+    
+    if (!formData.property_address.trim()) {
+      newErrors.property_address = 'Property address is required';
+    }
+    
+    if (!formData.monthly_rent || formData.monthly_rent <= 0) {
+      newErrors.monthly_rent = 'Monthly rent must be greater than 0';
+    }
+    
+    if (!formData.start_date) {
+      newErrors.start_date = 'Start date is required';
+    }
+    
+    if (!formData.end_date) {
+      newErrors.end_date = 'End date is required';
+    } else if (new Date(formData.end_date) <= new Date(formData.start_date)) {
+      newErrors.end_date = 'End date must be after start date';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateForm()) {
+      onSubmit(formData);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    
+    // Handle numeric fields
+    if (name === 'monthly_rent' || name === 'notice_period_days' || name === 'template_data.notice_period_days') {
+      const numValue = type === 'number' ? Number(value) : parseInt(value, 10);
+      
+      if (name === 'template_data.notice_period_days') {
+        setFormData(prev => ({
+          ...prev,
+          template_data: {
+            ...prev.template_data,
+            notice_period_days: isNaN(numValue) ? 30 : numValue
+          }
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          [name]: isNaN(numValue) ? 0 : numValue
+        }));
+      }
+      return;
+    }
+
+    // Handle other template_data fields
+    if (name.startsWith('template_data.')) {
+      const field = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        template_data: {
+          ...prev.template_data,
+          [field]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+        }
+      }));
+      return;
+    }
+
+    // Handle other fields
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-6">
+      <h2 className="text-lg font-semibold text-gray-900 mb-4">Create New Lease</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Property Name
+                              </label>
+                              <input
+                                type="text"
+              value={formData.property_name}
+              onChange={handleChange}
+              name="property_name"
+              className={`w-full px-3 py-2 border rounded-md ${errors.property_name ? 'border-red-500' : 'border-gray-300'}`}
+              placeholder="Enter property name"
             />
-          </div>
-          
-          <div className="flex items-center space-x-3 w-full sm:w-auto">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as LeaseStatus | 'all')}
-              className="block pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white"
-            >
-              <option value="all">All Status</option>
-              <option value="draft">Draft</option>
-              <option value="pending">Pending Review</option>
-              <option value="awaiting_landlord_signature">Awaiting Landlord Signature</option>
-              <option value="awaiting_tenant_signature">Awaiting Tenant Signature</option>
-              <option value="changes_requested">Changes Requested</option>
-              <option value="active">Active</option>
-              <option value="completed">Completed</option>
-              <option value="terminated">Terminated</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-            
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-              className="block pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white"
-            >
-              <option value="desc">Newest First</option>
-              <option value="asc">Oldest First</option>
-            </select>
-            
-            {/* Action buttons - integrated with dropdowns */}
-            {activeTab === 'landlord' && (
-              <button
-                onClick={() => navigate('/leases/create')}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <PlusIcon className="h-5 w-5 mr-2" />
-                New Lease
-              </button>
-            )}
-            
-            {activeTab === 'tenant' && (
-              <button
-                onClick={() => setShowJoinLeaseModal(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <PlusIcon className="h-5 w-5 mr-2" />
-                Join a Lease
-              </button>
-            )}
-          </div>
-        </div>
+            {errors.property_name && <p className="mt-1 text-sm text-red-600">{errors.property_name}</p>}
+                            </div>
 
-        {/* Leases grid */}
-        <div className="mt-4">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-64 bg-white rounded-lg shadow-sm">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
-          ) : filteredLeases.length === 0 ? (
-            <EmptyState role={activeTab} onAction={handleAction} />
-          ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {filteredLeases.map((lease) => (
-                <LeaseCard
-                  key={lease.id}
-                  lease={lease}
-                  userRole={activeTab === 'all' ? (lease.landlord_id === currentUser?.id ? 'landlord' : 'tenant') : activeTab === 'landlord' ? 'landlord' : 'tenant'}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+                            <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Property Address
+                              </label>
+                              <input
+                                type="text"
+              value={formData.property_address}
+              onChange={handleChange}
+              name="property_address"
+              className={`w-full px-3 py-2 border rounded-md ${errors.property_address ? 'border-red-500' : 'border-gray-300'}`}
+              placeholder="Enter property address"
+            />
+            {errors.property_address && <p className="mt-1 text-sm text-red-600">{errors.property_address}</p>}
+                          </div>
 
-        {/* Create New Lease Modal */}
-        <Modal
-          isOpen={showNewLeaseModal}
-          onClose={() => setShowNewLeaseModal(false)}
-          title="Create New Lease"
-          size="md"
-        >
-          <form onSubmit={handleCreateLease} className="space-y-6">
-            {error && (
-              <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-700">{error}</p>
-                  </div>
-                </div>
-              </div>
-            )}
+                              <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Monthly Rent ($)
+                                </label>
+                                  <input
+                                    type="number"
+              value={formData.monthly_rent}
+              onChange={handleChange}
+              name="monthly_rent"
+              className={`w-full px-3 py-2 border rounded-md ${errors.monthly_rent ? 'border-red-500' : 'border-gray-300'}`}
+                                    min="0"
+              step="0.01"
+                                  />
+            {errors.monthly_rent && <p className="mt-1 text-sm text-red-600">{errors.monthly_rent}</p>}
+                                </div>
 
-            <div className="bg-white shadow-sm rounded-lg p-6 border border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Property Details</h3>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="property_name" className="block text-sm font-medium text-gray-700">
-                    Property Name
+                              <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Currency
+                                </label>
+                                <select
+              value={formData.currency}
+              onChange={handleChange}
+              name="currency"
+              className={`w-full px-3 py-2 border rounded-md ${errors.currency ? 'border-red-500' : 'border-gray-300'}`}
+                                >
+                                  {Object.entries(CURRENCY_NAMES).map(([code, name]) => (
+                                    <option key={code} value={code}>
+                                      {CURRENCY_SYMBOLS[code as Currency]} {name}
+                                    </option>
+                                  ))}
+                                </select>
+                          </div>
+
+                              <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Start Date
+                                </label>
+                                <input
+                                  type="date"
+              value={formData.start_date}
+              onChange={handleChange}
+              name="start_date"
+              className={`w-full px-3 py-2 border rounded-md ${errors.start_date ? 'border-red-500' : 'border-gray-300'}`}
+            />
+            {errors.start_date && <p className="mt-1 text-sm text-red-600">{errors.start_date}</p>}
+                              </div>
+
+                              <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  End Date
+                                </label>
+                                <input
+                                  type="date"
+              value={formData.end_date}
+              onChange={handleChange}
+              name="end_date"
+              className={`w-full px-3 py-2 border rounded-md ${errors.end_date ? 'border-red-500' : 'border-gray-300'}`}
+            />
+            {errors.end_date && <p className="mt-1 text-sm text-red-600">{errors.end_date}</p>}
+                              </div>
+                            </div>
+
+        <div className="border-t pt-4">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Terms</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Additional Terms
+              </label>
+              <textarea
+                value={formData.template_data.additional_terms}
+                onChange={handleChange}
+                name="template_data.additional_terms"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                rows={3}
+                placeholder="Enter any additional terms"
+              />
+                          </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Utilities Included
+              </label>
+              <div className="space-y-2">
+                {['Electricity', 'Water', 'Gas', 'Internet', 'Trash'].map((utility) => (
+                  <label key={utility} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.template_data.utilities_included.includes(utility)}
+                      onChange={handleChange}
+                      name={`template_data.utilities_included.${utility}`}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">{utility}</span>
                   </label>
-                  <input
-                    type="text"
-                    id="property_name"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    value={newLeaseForm.property_name}
-                    onChange={(e) => setNewLeaseForm({ ...newLeaseForm, property_name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <label htmlFor="property_address" className="block text-sm font-medium text-gray-700">
-                    Property Address
-                  </label>
-                  <input
-                    type="text"
-                    id="property_address"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    value={newLeaseForm.property_address}
-                    onChange={(e) => setNewLeaseForm({ ...newLeaseForm, property_address: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white shadow-sm rounded-lg p-6 border border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Lease Terms</h3>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="monthly_rent" className="block text-sm font-medium text-gray-700">
-                      Monthly Rent
-                    </label>
-                    <div className="mt-1 relative rounded-md shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-gray-500 sm:text-sm">$</span>
+                ))}
+                        </div>
                       </div>
-                      <input
-                        type="number"
-                        id="monthly_rent"
-                        className="pl-7 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                        value={newLeaseForm.monthly_rent}
-                        onChange={(e) => setNewLeaseForm({ ...newLeaseForm, monthly_rent: e.target.value ? Number(e.target.value) : 0 })}
-                        required
-                        min="0"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="currency" className="block text-sm font-medium text-gray-700">
-                      Currency
-                    </label>
-                    <select
-                      id="currency"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      value={newLeaseForm.currency}
-                      onChange={(e) => setNewLeaseForm({ ...newLeaseForm, currency: e.target.value as Currency })}
-                      required
-                    >
-                      {Object.entries(CURRENCY_NAMES).map(([code, name]) => (
-                        <option key={code} value={code}>
-                          {CURRENCY_SYMBOLS[code as Currency]} {name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="start_date" className="block text-sm font-medium text-gray-700">
-                      Start Date
-                    </label>
-                    <input
-                      type="date"
-                      id="start_date"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      value={newLeaseForm.start_date}
-                      onChange={(e) => setNewLeaseForm({ ...newLeaseForm, start_date: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="end_date" className="block text-sm font-medium text-gray-700">
-                      End Date
-                    </label>
-                    <input
-                      type="date"
-                      id="end_date"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      value={newLeaseForm.end_date}
-                      onChange={(e) => setNewLeaseForm({ ...newLeaseForm, end_date: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setShowNewLeaseModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                disabled={isCreating}
-              >
-                {isCreating ? 'Creating...' : 'Create Lease'}
-              </button>
-            </div>
-          </form>
-        </Modal>
-
-        {/* Join Existing Lease Modal */}
-        <Modal
-          isOpen={showJoinLeaseModal}
-          onClose={() => setShowJoinLeaseModal(false)}
-          title="Join Existing Lease"
-          size="md"
-        >
-          <form onSubmit={handleJoinLease} className="space-y-6">
-            {joinError && (
-              <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-700">{joinError}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="bg-white shadow-sm rounded-lg p-6 border border-gray-200">
-              <p className="text-sm text-gray-600 mb-4">
-                Enter the lease ID provided by your landlord to join an existing lease.
-              </p>
-              <div>
-                <label htmlFor="lease_id" className="block text-sm font-medium text-gray-700">
-                  Lease ID
-                </label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Pets Allowed
+              </label>
+              <label className="flex items-center">
                 <input
-                  type="text"
-                  id="lease_id"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  value={joinLeaseForm.lease_id}
-                  onChange={(e) => setJoinLeaseForm({ ...joinLeaseForm, lease_id: e.target.value })}
-                  required
-                  placeholder="Enter the lease ID"
+                  type="checkbox"
+                  checked={formData.template_data.pets_allowed}
+                  onChange={handleChange}
+                  name="template_data.pets_allowed"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-              </div>
+                <span className="ml-2 text-sm text-gray-700">Allow pets in the property</span>
+              </label>
             </div>
 
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setShowJoinLeaseModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                disabled={isJoining}
-              >
-                {isJoining ? 'Joining...' : 'Join Lease'}
-              </button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Smoking Allowed
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.template_data.smoking_allowed}
+                  onChange={handleChange}
+                  name="template_data.smoking_allowed"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700">Allow smoking in the property</span>
+              </label>
             </div>
-          </form>
-        </Modal>
-      </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notice Period (days)
+              </label>
+              <input
+                type="number"
+                value={formData.template_data.notice_period_days}
+                onChange={handleChange}
+                name="template_data.notice_period_days"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                min="1"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-3">
+                        <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+          >
+            Cancel
+                        </button>
+                        <button
+            type="submit"
+            className="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transform hover:scale-105 transition-all duration-200"
+          >
+            Create Lease
+                        </button>
+                      </div>
+                    </form>
+              </div>
+  );
+};
+
+const JoinLeaseForm: React.FC<{ onSubmit: (formData: JoinLeaseForm) => void, onCancel: () => void }> = ({ onSubmit, onCancel }) => {
+  const [formData, setFormData] = useState<JoinLeaseForm>({
+    lease_id: '',
+    template_data: {
+      additional_terms: '',
+      utilities_included: [],
+      pets_allowed: false,
+      smoking_allowed: false,
+      notice_period_days: 30
+    }
+  });
+
+  const [errors, setErrors] = useState<FormErrors>({});
+
+  const validateForm = () => {
+    const newErrors: FormErrors = {};
+    
+    if (!formData.lease_id.trim()) {
+      newErrors.lease_id = 'Lease ID is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateForm()) {
+      onSubmit(formData);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    
+    // Handle numeric fields
+    if (name === 'monthly_rent' || name === 'notice_period_days' || name === 'template_data.notice_period_days') {
+      const numValue = type === 'number' ? Number(value) : parseInt(value, 10);
+      
+      if (name === 'template_data.notice_period_days') {
+        setFormData(prev => ({
+          ...prev,
+          template_data: {
+            ...prev.template_data,
+            notice_period_days: isNaN(numValue) ? 30 : numValue
+          }
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          [name]: isNaN(numValue) ? 0 : numValue
+        }));
+      }
+      return;
+    }
+
+    // Handle other template_data fields
+    if (name.startsWith('template_data.')) {
+      const field = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        template_data: {
+          ...prev.template_data,
+          [field]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+        }
+      }));
+      return;
+    }
+
+    // Handle other fields
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-6">
+      <h2 className="text-lg font-semibold text-gray-900 mb-4">Join a Lease</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+                      <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Lease ID
+                          </label>
+                          <input
+                            type="text"
+            value={formData.lease_id}
+            onChange={handleChange}
+            name="lease_id"
+            className={`w-full px-3 py-2 border rounded-md ${errors.lease_id ? 'border-red-500' : 'border-gray-300'}`}
+            placeholder="Enter the lease ID"
+          />
+          {errors.lease_id && <p className="mt-1 text-sm text-red-600">{errors.lease_id}</p>}
+                        </div>
+
+        <div className="flex justify-end space-x-3">
+                        <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+          >
+            Cancel
+                        </button>
+                        <button
+            type="submit"
+            className="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transform hover:scale-105 transition-all duration-200"
+          >
+            Join Lease
+                        </button>
+                      </div>
+                    </form>
     </div>
   );
 };

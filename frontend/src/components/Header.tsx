@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import Logo from './Logo';
+import NotificationDropdown from './NotificationDropdown';
 
 // Move navigation outside component to prevent recreation on each render
 const navigation = [
@@ -73,138 +74,175 @@ const Header = () => {
   };
 
   return (
-    <header className={`fixed w-full top-0 z-50 bg-white ${scrolled ? 'shadow-md' : ''}`}>
-      <nav className="mx-auto flex max-w-7xl items-center justify-between p-6 lg:px-8" aria-label="Global">
-        <div className="flex lg:flex-1">
-          <Link to="/" className="-m-1.5 p-1.5 flex items-center">
-            <Logo className="h-8 w-auto text-primary mr-2" />
-            <span className="text-2xl font-bold text-primary">Reenter</span>
-          </Link>
-        </div>
-        <div className="flex lg:hidden">
-          <button
-            type="button"
-            className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700"
-            onClick={() => setMobileMenuOpen(true)}
-          >
-            <span className="sr-only">Open main menu</span>
-            <Bars3Icon className="h-6 w-6" aria-hidden="true" />
-          </button>
-        </div>
-        <div className="hidden lg:flex lg:gap-x-12">
-          {navigation.map((item) => (
-            <NavLink
-              key={item.name}
-              to={item.href}
-              className={({ isActive }) => 
-                isActive 
-                  ? "text-primary font-semibold border-b-2 border-primary" 
-                  : "text-gray-700 hover:text-primary font-semibold hover:border-b-2 hover:border-primary transition-all duration-200"
-              }
-            >
-              {item.name}
-            </NavLink>
-          ))}
-        </div>
-        <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:items-center">
-          {isLoggedIn ? (
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="inline-flex items-center text-gray-700 hover:text-primary"
-              >
-                <UserCircleIcon className="h-6 w-6 mr-1" />
-                <span>{currentUser?.name || 'User'}</span>
-              </button>
-              
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200">
-                  <Link 
-                    to="/dashboard" 
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                    onClick={() => setDropdownOpen(false)}
+    <header className="fixed w-full top-0 z-50">
+      <nav 
+        className={`mx-auto transition-all duration-300`}
+        aria-label="Global"
+      >
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="flex h-16 items-center justify-between">
+            {/* Logo Section */}
+            <div className="flex-shrink-0">
+              <Link to="/" className="flex items-center gap-2">
+                <Logo className="h-8 w-auto text-primary" />
+                <span className="text-xl font-semibold text-gray-900">Reenter</span>
+              </Link>
+            </div>
+
+            {/* Main Navigation */}
+            <div className="hidden lg:flex lg:items-center lg:gap-x-6 bg-white/30 hover:bg-white/40 px-6 py-2 rounded-full backdrop-blur-sm shadow-sm transition-all duration-200">
+              {navigation.map((item) => (
+                <NavLink
+                  key={item.name}
+                  to={item.href}
+                  className={({ isActive }) => 
+                    `relative px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                      isActive 
+                        ? "text-primary" 
+                        : "text-gray-600 hover:text-gray-900"
+                    } after:absolute after:left-0 after:bottom-0 after:h-0.5 after:w-full after:origin-center after:scale-x-0 after:bg-primary after:transition-transform hover:after:scale-x-100 ${
+                      isActive ? "after:scale-x-100" : ""
+                    }`
+                  }
+                >
+                  {item.name}
+                </NavLink>
+              ))}
+            </div>
+
+            {/* User Section */}
+            <div className="hidden lg:flex lg:items-center lg:gap-x-6 bg-white/30 hover:bg-white/40 px-4 py-2 rounded-full backdrop-blur-sm shadow-sm transition-all duration-200">
+              {isLoggedIn ? (
+                <div className="relative flex items-center space-x-4" ref={dropdownRef}>
+                  <NotificationDropdown />
+                  <div className="h-8 w-px bg-gray-200/50" aria-hidden="true" />
+                  <button
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                    className="flex items-center justify-center w-8 h-8 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                   >
-                    <ChartBarSquareIcon className="h-5 w-5 mr-2" />
-                    Dashboard
-                  </Link>
-                  <Link 
-                    to="/profile" 
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                    onClick={() => setDropdownOpen(false)}
-                  >
-                    <UserCircleIcon className="h-5 w-5 mr-2" />
-                    Profile
-                  </Link>
-                  <Link 
-                    to="/leases" 
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                    onClick={() => setDropdownOpen(false)}
-                  >
-                    <BuildingOfficeIcon className="h-5 w-5 mr-2" />
-                    Leases
-                  </Link>
-                  <Link 
-                    to="/payments" 
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                    onClick={() => setDropdownOpen(false)}
-                  >
-                    <CreditCardIcon className="h-5 w-5 mr-2" />
-                    Payments
-                  </Link>
-                  <Link 
-                    to="/messages" 
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                    onClick={() => setDropdownOpen(false)}
-                  >
-                    <EnvelopeIcon className="h-5 w-5 mr-2" />
-                    Messages
-                  </Link>
-                  <Link 
-                    to="/notifications" 
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                    onClick={() => setDropdownOpen(false)}
-                  >
-                    <BellIcon className="h-5 w-5 mr-2" />
-                    Notifications
-                  </Link>
-                  <Link 
-                    to="/settings" 
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                    onClick={() => setDropdownOpen(false)}
-                  >
-                    <Cog6ToothIcon className="h-5 w-5 mr-2" />
-                    Settings
-                  </Link>
-                  <hr className="my-1" />
-                  <button 
-                    onClick={handleLogout}
-                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
-                  >
-                    <ArrowRightOnRectangleIcon className="h-5 w-5 mr-2" />
-                    Sign out
+                    {currentUser?.photo_url ? (
+                      <img
+                        className="h-8 w-8 rounded-full ring-2 ring-white"
+                        src={currentUser.photo_url}
+                        alt=""
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-medium text-sm ring-2 ring-white">
+                        {currentUser?.name?.charAt(0) || '?'}
+                      </div>
+                    )}
                   </button>
+                  
+                  {dropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg py-2 z-10 border border-white/20 top-full">
+                      {/* Dashboard - Primary Action */}
+                      <Link 
+                        to="/dashboard" 
+                        className="block px-5 py-3 text-base font-semibold text-gray-900 hover:bg-gray-50 flex items-center"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        <ChartBarSquareIcon className="h-5 w-5 mr-3 text-primary" />
+                        Dashboard
+                      </Link>
+
+                      <div className="my-2 border-t border-gray-100" />
+
+                      {/* Core Features Group */}
+                      <Link 
+                        to="/profile" 
+                        className="block px-5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        <UserCircleIcon className="h-5 w-5 mr-3" />
+                        Profile
+                      </Link>
+                      <Link 
+                        to="/leases" 
+                        className="block px-5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        <BuildingOfficeIcon className="h-5 w-5 mr-3" />
+                        Leases
+                      </Link>
+                      <Link 
+                        to="/payments" 
+                        className="block px-5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        <CreditCardIcon className="h-5 w-5 mr-3" />
+                        Payments
+                      </Link>
+                      <Link 
+                        to="/messages" 
+                        className="block px-5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        <EnvelopeIcon className="h-5 w-5 mr-3" />
+                        Messages
+                      </Link>
+
+                      <div className="my-2 border-t border-gray-100" />
+
+                      {/* Settings Group */}
+                      <Link 
+                        to="/settings" 
+                        className="block px-5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        <Cog6ToothIcon className="h-5 w-5 mr-3" />
+                        Settings
+                      </Link>
+
+                      <div className="my-2 border-t border-gray-100" />
+
+                      {/* Sign Out */}
+                      <button 
+                        onClick={handleLogout}
+                        className="block w-full text-left px-5 py-2.5 text-sm text-red-600 hover:bg-gray-50 flex items-center"
+                      >
+                        <ArrowRightOnRectangleIcon className="h-5 w-5 mr-3" />
+                        Sign out
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-x-4">
+                  <Link 
+                    to="/login" 
+                    className="text-sm font-medium text-gray-700 hover:text-primary relative after:absolute after:left-0 after:bottom-0 after:h-0.5 after:w-full after:origin-center after:scale-x-0 after:bg-primary after:transition-transform hover:after:scale-x-100"
+                  >
+                    Log in
+                  </Link>
+                  <div className="h-4 w-px bg-gray-200/50" aria-hidden="true" />
+                  <Link
+                    to="/signup"
+                    className="rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-primary-dark transition-all duration-200"
+                  >
+                    Sign up
+                  </Link>
                 </div>
               )}
             </div>
-          ) : (
-            <div className="flex items-center space-x-4">
-              <Link to="/login" className="text-gray-700 hover:text-primary font-semibold hover:border-b-2 hover:border-primary px-1">
-                Log in
-              </Link>
-              <Link
-                to="/signup"
-                className="rounded-md bg-primary px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-dark"
+
+            {/* Mobile menu button */}
+            <div className="flex lg:hidden">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-full p-2.5 text-gray-700 bg-white/30 hover:bg-white/40 backdrop-blur-sm shadow-sm transition-all duration-200"
+                onClick={() => setMobileMenuOpen(true)}
               >
-                Sign up
-              </Link>
+                <span className="sr-only">Open main menu</span>
+                <Bars3Icon className="h-6 w-6" aria-hidden="true" />
+              </button>
             </div>
-          )}
+          </div>
         </div>
       </nav>
 
       <Dialog as="div" className="lg:hidden" open={mobileMenuOpen} onClose={setMobileMenuOpen}>
         <div className="fixed inset-0 z-50" />
-        <Dialog.Panel className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-white px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
+        <Dialog.Panel className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-white/80 backdrop-blur-md px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
           <div className="flex items-center justify-between">
             <Link to="/" className="-m-1.5 p-1.5 flex items-center" onClick={() => setMobileMenuOpen(false)}>
               <Logo className="h-8 w-auto text-primary mr-2" />

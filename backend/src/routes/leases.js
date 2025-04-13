@@ -275,35 +275,35 @@ router.put(
       const isLandlordConfirmation = req.user.id === lease.landlord_id && 
                                     lease.status === 'awaiting_landlord_signature' &&
                                     status === 'active';
-      
+
       // If status is changing to active, generate initial payment
       if ((status === 'active' && lease.status !== 'active') || isLandlordConfirmation) {
         console.log(`Activating lease ${req.params.id}, generating payment and notifications`);
         
         try {
-          // Get current date
-          const currentDate = new Date();
-          
-          // Generate payment for first month
-          await Payment.create({
-            lease_id: lease.id,
-            amount: parseFloat(lease.monthly_rent) + parseFloat(lease.premium),
-            due_date: currentDate,
-            status: 'pending'
-          });
+        // Get current date
+        const currentDate = new Date();
+        
+        // Generate payment for first month
+        await Payment.create({
+          lease_id: lease.id,
+          amount: parseFloat(lease.monthly_rent) + parseFloat(lease.premium),
+          due_date: currentDate,
+          status: 'pending'
+        });
 
-          // Create notifications for both parties
-          await Notification.create({
-            user_id: lease.landlord_id,
-            type: 'lease_activated',
-            message: `Lease for ${lease.property_address} has been activated`
-          });
-          
-          await Notification.create({
-            user_id: lease.tenant_id,
-            type: 'lease_activated',
-            message: `Lease for ${lease.property_address} has been activated`
-          });
+        // Create notifications for both parties
+        await Notification.create({
+          user_id: lease.landlord_id,
+          type: 'lease_activated',
+          message: `Lease for ${lease.property_address} has been activated`
+        });
+        
+        await Notification.create({
+          user_id: lease.tenant_id,
+          type: 'lease_activated',
+          message: `Lease for ${lease.property_address} has been activated`
+        });
         } catch (innerErr) {
           console.error('Error during lease activation process:', innerErr);
           // Continue with status update even if payment/notification creation fails

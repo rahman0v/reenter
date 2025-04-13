@@ -74,6 +74,58 @@ export const userService = {
     const response = await api.put('/users/profile', profileData);
     return response.data;
   },
+  getPublicProfile: async (userId) => {
+    const response = await api.get(`/users/${userId}/public`);
+    return response.data;
+  },
+  uploadProfilePhoto: async (formData) => {
+    const response = await api.post('/users/profile/photo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  },
+  verifyEmail: async () => {
+    const response = await api.post('/users/verify/email');
+    return response.data;
+  },
+  verifyPhone: async (code) => {
+    const response = await api.post('/users/verify/phone', { code });
+    return response.data;
+  },
+  verifyID: async (formData) => {
+    const response = await api.post('/users/verify/id', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  },
+  verifyBankAccount: async (accountData) => {
+    const response = await api.post('/users/verify/bank', accountData);
+    return response.data;
+  },
+  updatePassword: async (passwordData) => {
+    const response = await api.post('/users/change-password', passwordData);
+    return response.data;
+  },
+  getPaymentMethods: async () => {
+    const response = await api.get('/users/payment-methods');
+    return response.data;
+  },
+  addPaymentMethod: async (paymentMethodData) => {
+    const response = await api.post('/users/payment-methods', paymentMethodData);
+    return response.data;
+  },
+  deletePaymentMethod: async (id) => {
+    const response = await api.delete(`/users/payment-methods/${id}`);
+    return response.data;
+  },
+  connectSocialAccount: async (platform) => {
+    const response = await api.post(`/users/connect/${platform}`);
+    return response.data;
+  }
 };
 
 // Lease services
@@ -181,6 +233,38 @@ export const notificationService = {
     const response = await api.put('/notifications/read-all');
     return response.data;
   },
+};
+
+// Rating services
+export const ratingService = {
+  getUserRatings: async (userId) => {
+    const response = await api.get(`/ratings/user/${userId}`);
+    return response.data;
+  },
+  
+  getLeaseRatings: async (leaseId) => {
+    const response = await api.get(`/ratings/lease/${leaseId}`);
+    return response.data;
+  },
+  
+  getRating: async (id) => {
+    const response = await api.get(`/ratings/${id}`);
+    return response.data;
+  },
+  
+  createRating: async (ratingData) => {
+    const response = await api.post('/ratings', ratingData);
+    return response.data;
+  },
+  
+  updateRating: async (id, updateData) => {
+    const response = await api.put(`/ratings/${id}`, updateData);
+    return response.data;
+  },
+  
+  deleteRating: async (id) => {
+    await api.delete(`/ratings/${id}`);
+  }
 };
 
 export default api; 

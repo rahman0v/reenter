@@ -1,4 +1,4 @@
-const { pool } = require('../config/db');
+const { safeQuery, pool } = require('../db');
 const crypto = require('crypto');
 const { Pool } = require('pg');
 
@@ -33,94 +33,185 @@ if (!dbPool || typeof dbPool.query !== 'function') {
   }
 }
 
-// Helper function to safely perform database operations
-const safeQuery = async (query, params = []) => {
-  if (!dbPool || typeof dbPool.query !== 'function') {
-    throw new Error('Database pool not properly initialized');
-  }
-  
-  try {
-    return await dbPool.query(query, params);
-  } catch (err) {
-    console.error(`Error executing query: ${query.slice(0, 100)}...`);
-    console.error('Error details:', err);
-    throw err;
-  }
-};
-
 class Lease {
   static generateRefCode() {
     // Generate a 8-character unique reference code
     return crypto.randomBytes(4).toString('hex').toUpperCase();
   }
 
-  static async create({
-    landlord_id,
-    property_name,
-    property_address,
-    monthly_rent,
-    currency,
-    start_date,
-    end_date,
-    premium = 8.5, // Default premium to 8.5% if not provided
-    template_data = {} // Optional template data for customizable fields
-  }) {
+  static async create(data) {
     try {
-      // Generate a unique reference code
-      const ref_code = this.generateRefCode();
-      
-      // Ensure premium is a number
-      const premiumValue = typeof premium === 'boolean' 
-        ? (premium ? 8.5 : 0) // Convert boolean to number (8.5% if true, 0 if false)
-        : Number(premium);
-      
-      // Insert lease into database with premium column
-      const query = `
-        INSERT INTO leases (
-          landlord_id, property_name, property_address, 
-          monthly_rent, currency, start_date, end_date,
-          ref_code, status, created_at, premium
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
-        RETURNING *
-      `;
-      
-      const values = [
-        landlord_id, 
-        property_name, 
-        property_address,
-        monthly_rent,
-        currency,
-        start_date,
-        end_date,
-        ref_code,
-        'draft', // Initial status
-        premiumValue // Use the converted premium value
-      ];
-      
-      const { rows } = await safeQuery(query, values);
-      
-      // Create an event for lease creation (but handle missing table gracefully)
-      if (rows[0]) {
-        try {
-          await this.createEvent(rows[0].id, landlord_id, 'created', {
-            template_data: template_data // Store template_data in the event details
-          });
-        } catch (eventError) {
-          // If the error is because the table doesn't exist (code 42P01), continue
-          // Otherwise, log the error but don't fail the lease creation
-          if (eventError.code !== '42P01') {
-            console.error('Warning: Could not create lease event:', eventError);
-          } else {
-            console.warn('lease_events table does not exist. Skipping event creation.');
-          }
+      const result = await safeQuery(
+        `INSERT INTO leases (
+          title, description, monthly_rent, security_deposit,
+          start_date, end_date, status, created_by,
+          template_data
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *`,
+        [
+          data.title,
+          data.description,
+          data.monthly_rent,
+          data.security_deposit,
+          data.start_date,
+          data.end_date,
+          data.status || 'draft',
+          data.created_by,
+          JSON.stringify(data.template_data || {})
+        ]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error creating lease:', error);
+      throw error;
+    }
+  }
+
+  static async findById(id) {
+    try {
+      const result = await safeQuery(
+        'SELECT * FROM leases WHERE id = $1',
+        [id]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error finding lease by ID:', error);
+      throw error;
+    }
+  }
+
+  static async findByUserId(userId) {
+    try {
+      const result = await safeQuery(
+        'SELECT * FROM leases WHERE created_by = $1 ORDER BY created_at DESC',
+        [userId]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('Error finding leases by user ID:', error);
+      throw error;
+    }
+  }
+
+  static async update(id, data) {
+    try {
+      const updates = [];
+      const values = [];
+      let valueCount = 1;
+
+      // Build dynamic update query
+      Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined && key !== 'id') {
+          updates.push(`${key} = $${valueCount}`);
+          values.push(key === 'template_data' ? JSON.stringify(value) : value);
+          valueCount++;
+        }
+      });
+
+      if (updates.length === 0) {
+        throw new Error('No valid fields to update');
+      }
+
+      values.push(id);
+      const result = await safeQuery(
+        `UPDATE leases 
+         SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $${valueCount}
+         RETURNING *`,
+        values
+      );
+
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error updating lease:', error);
+      throw error;
+    }
+  }
+
+  static async delete(id) {
+    try {
+      const result = await safeQuery(
+        'DELETE FROM leases WHERE id = $1 RETURNING *',
+        [id]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error deleting lease:', error);
+      throw error;
+    }
+  }
+
+  static async updateStatus(id, newStatus) {
+    try {
+      const validTransitions = {
+        draft: ['pending'],
+        pending: ['awaiting_tenant_signature', 'cancelled'],
+        awaiting_tenant_signature: ['awaiting_landlord_signature', 'cancelled'],
+        awaiting_landlord_signature: ['active', 'cancelled'],
+        active: ['ended', 'cancelled'],
+        ended: [],
+        cancelled: []
+      };
+
+      // Get current lease status
+      const lease = await this.findById(id);
+      if (!lease) {
+        throw new Error('Lease not found');
+      }
+
+      // Check if transition is valid
+      const currentStatus = lease.status;
+      if (!validTransitions[currentStatus]?.includes(newStatus)) {
+        // Special case: allow direct transition to active from awaiting_landlord_signature
+        if (currentStatus === 'awaiting_landlord_signature' && newStatus === 'active') {
+          console.log('Allowing special transition from awaiting_landlord_signature to active');
+        } else {
+          throw new Error(`Invalid status transition from ${currentStatus} to ${newStatus}`);
         }
       }
-      
-      return rows[0];
-    } catch (err) {
-      console.error('Error in Lease.create:', err);
-      throw err;
+
+      const result = await safeQuery(
+        `UPDATE leases 
+         SET status = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2
+         RETURNING *`,
+        [newStatus, id]
+      );
+
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error updating lease status:', error);
+      throw error;
+    }
+  }
+
+  static async join(leaseId, userId) {
+    try {
+      const result = await safeQuery(
+        `INSERT INTO lease_tenants (lease_id, user_id)
+         VALUES ($1, $2)
+         RETURNING *`,
+        [leaseId, userId]
+      );
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error joining lease:', error);
+      throw error;
+    }
+  }
+
+  static async getTenants(leaseId) {
+    try {
+      const result = await safeQuery(
+        `SELECT u.* FROM users u
+         JOIN lease_tenants lt ON u.id = lt.user_id
+         WHERE lt.lease_id = $1`,
+        [leaseId]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('Error getting lease tenants:', error);
+      throw error;
     }
   }
 
@@ -167,7 +258,7 @@ class Lease {
     return rows[0];
   }
 
-  static async findById(id) {
+  static async findByUserId(userId) {
     const query = `
       SELECT l.*, 
              u1.name as landlord_name, 
@@ -175,10 +266,11 @@ class Lease {
       FROM leases l
       JOIN users u1 ON l.landlord_id = u1.id
       LEFT JOIN users u2 ON l.tenant_id = u2.id
-      WHERE l.id = $1
+      WHERE l.landlord_id = $1 OR l.tenant_id = $1
+      ORDER BY l.created_at DESC
     `;
-    const { rows } = await safeQuery(query, [id]);
-    return rows[0];
+    const { rows } = await safeQuery(query, [userId]);
+    return rows;
   }
 
   static async update(id, {
@@ -286,12 +378,12 @@ class Lease {
     
     try {
       // Update the lease status using our safe query helper
-      const query = `
-        UPDATE leases 
-        SET status = $1, updated_at = NOW()
-        WHERE id = $2
-        RETURNING *
-      `;
+    const query = `
+      UPDATE leases 
+      SET status = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING *
+    `;
       
       const { rows } = await safeQuery(query, [status, id]);
       

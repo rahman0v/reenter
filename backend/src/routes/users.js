@@ -4,6 +4,7 @@ const User = require('../models/user');
 const PaymentMethod = require('../models/payment_method');
 const auth = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
+const { pool } = require('../config/db');
 
 const router = express.Router();
 
@@ -16,7 +17,68 @@ router.get('/profile', auth, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(user);
+
+    // Fetch ratings data
+    const ratingsQuery = `
+      SELECT 
+        AVG(CASE WHEN role = 'landlord' THEN rating ELSE NULL END) as landlord_avg,
+        COUNT(CASE WHEN role = 'landlord' THEN 1 ELSE NULL END) as landlord_count,
+        AVG(CASE WHEN role = 'tenant' THEN rating ELSE NULL END) as tenant_avg,
+        COUNT(CASE WHEN role = 'tenant' THEN 1 ELSE NULL END) as tenant_count
+      FROM ratings
+      WHERE reviewed_id = $1
+    `;
+    
+    // Fetch verification status for all verification types
+    const verificationsQuery = `
+      SELECT type, status
+      FROM verifications
+      WHERE user_id = $1 AND status = 'verified'
+    `;
+    
+    // Execute both queries in parallel
+    const [ratingsResult, verificationsResult] = await Promise.all([
+      User.safeQuery(ratingsQuery, [req.user.id]),
+      User.safeQuery(verificationsQuery, [req.user.id])
+    ]);
+    
+    const ratingsData = ratingsResult.rows[0];
+    const verificationsData = verificationsResult.rows;
+    
+    // Map verifications to a more usable format
+    const verifications = {
+      email: verificationsData.some(v => v.type === 'email' && v.status === 'verified'),
+      phone: verificationsData.some(v => v.type === 'phone' && v.status === 'verified'),
+      id: verificationsData.some(v => v.type === 'id' && v.status === 'verified'),
+      bank: verificationsData.some(v => v.type === 'bank' && v.status === 'verified')
+    };
+    
+    // Calculate trust score based on verifications and profile completeness
+    let trustScore = 0;
+    if (verifications.email) trustScore += 25;
+    if (verifications.phone) trustScore += 25;
+    if (verifications.id) trustScore += 25;
+    if (verifications.bank) trustScore += 25;
+    
+    // Add ratings to user profile
+    const userWithRatings = {
+      ...user,
+      ratings: {
+        as_landlord: {
+          average: parseFloat(ratingsData.landlord_avg) || 0,
+          count: parseInt(ratingsData.landlord_count) || 0
+        },
+        as_tenant: {
+          average: parseFloat(ratingsData.tenant_avg) || 0,
+          count: parseInt(ratingsData.tenant_count) || 0
+        },
+        total_reviews: (parseInt(ratingsData.landlord_count) || 0) + (parseInt(ratingsData.tenant_count) || 0)
+      },
+      verifications: verifications,
+      trust_score: trustScore
+    };
+    
+    res.json(userWithRatings);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -59,15 +121,15 @@ router.put(
       
       // Filter out undefined values
       const updateData = {
-        name, 
-        phone, 
-        bio, 
-        photo_url, 
-        preferred_name, 
-        address, 
-        emergency_contact, 
-        education_status, 
-        employment_status, 
+        name,
+        phone,
+        bio,
+        photo_url,
+        preferred_name,
+        address,
+        emergency_contact,
+        education_status,
+        employment_status,
         date_of_birth
       };
       
@@ -361,6 +423,223 @@ router.delete('/payment-methods/:id', auth, async (req, res) => {
   } catch (err) {
     console.error('Error deleting payment method:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// @route   GET api/users/:id/public
+// @desc    Get public profile of a user
+// @access  Private
+router.get('/:id/public', auth, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    
+    // Fetch the user
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Fetch ratings data
+    const query = `
+      SELECT 
+        AVG(CASE WHEN role = 'landlord' THEN rating ELSE NULL END) as landlord_avg,
+        COUNT(CASE WHEN role = 'landlord' THEN 1 ELSE NULL END) as landlord_count,
+        AVG(CASE WHEN role = 'tenant' THEN rating ELSE NULL END) as tenant_avg,
+        COUNT(CASE WHEN role = 'tenant' THEN 1 ELSE NULL END) as tenant_count
+      FROM ratings
+      WHERE reviewed_id = $1
+    `;
+    
+    const { rows } = await User.safeQuery(query, [userId]);
+    const ratingsData = rows[0];
+    
+    // Prepare public profile response
+    const publicProfile = {
+      id: user.id,
+      name: user.name,
+      preferred_name: user.preferred_name,
+      photo_url: user.photo_url,
+      bio: user.bio,
+      role: user.role,
+      created_at: user.created_at,
+      ratings: {
+        as_landlord: {
+          average: parseFloat(ratingsData.landlord_avg) || 0,
+          count: parseInt(ratingsData.landlord_count) || 0
+        },
+        as_tenant: {
+          average: parseFloat(ratingsData.tenant_avg) || 0,
+          count: parseInt(ratingsData.tenant_count) || 0
+        },
+        total_reviews: (parseInt(ratingsData.landlord_count) || 0) + (parseInt(ratingsData.tenant_count) || 0)
+      }
+    };
+    
+    res.json(publicProfile);
+  } catch (err) {
+    console.error('Error getting public profile:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST api/users/verify/email
+// @desc    Verify user's email
+// @access  Private
+router.post('/verify/email', auth, async (req, res) => {
+  try {
+    // In a real implementation, you would send an email with verification code
+    // For demo purposes, we'll mark it as verified immediately
+    
+    // Check if verification already exists
+    const checkQuery = 'SELECT * FROM verifications WHERE user_id = $1 AND type = $2';
+    const { rows: existing } = await User.safeQuery(checkQuery, [req.user.id, 'email']);
+    
+    let result;
+    if (existing.length > 0) {
+      // Update existing verification
+      const updateQuery = `
+        UPDATE verifications 
+        SET status = 'verified', verified_at = NOW() 
+        WHERE user_id = $1 AND type = $2
+        RETURNING *
+      `;
+      result = await User.safeQuery(updateQuery, [req.user.id, 'email']);
+    } else {
+      // Create new verification
+      const insertQuery = `
+        INSERT INTO verifications (user_id, type, status, verified_at)
+        VALUES ($1, $2, 'verified', NOW())
+        RETURNING *
+      `;
+      result = await User.safeQuery(insertQuery, [req.user.id, 'email']);
+    }
+    
+    res.status(200).json({ message: 'Email verified successfully' });
+  } catch (err) {
+    console.error('Error verifying email:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST api/users/verify/phone
+// @desc    Verify user's phone number
+// @access  Private
+router.post('/verify/phone', auth, async (req, res) => {
+  try {
+    const { code } = req.body;
+    
+    // In a real implementation, you would verify the code sent to the user's phone
+    // For demo purposes, we'll accept any code and mark it as verified immediately
+    
+    // Check if verification already exists
+    const checkQuery = 'SELECT * FROM verifications WHERE user_id = $1 AND type = $2';
+    const { rows: existing } = await User.safeQuery(checkQuery, [req.user.id, 'phone']);
+    
+    let result;
+    if (existing.length > 0) {
+      // Update existing verification
+      const updateQuery = `
+        UPDATE verifications 
+        SET status = 'verified', verified_at = NOW() 
+        WHERE user_id = $1 AND type = $2
+        RETURNING *
+      `;
+      result = await User.safeQuery(updateQuery, [req.user.id, 'phone']);
+    } else {
+      // Create new verification
+      const insertQuery = `
+        INSERT INTO verifications (user_id, type, status, verified_at)
+        VALUES ($1, $2, 'verified', NOW())
+        RETURNING *
+      `;
+      result = await User.safeQuery(insertQuery, [req.user.id, 'phone']);
+    }
+    
+    res.status(200).json({ message: 'Phone verified successfully' });
+  } catch (err) {
+    console.error('Error verifying phone:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST api/users/verify/id
+// @desc    Verify user's ID
+// @access  Private
+router.post('/verify/id', auth, async (req, res) => {
+  try {
+    // In a real implementation, you would store and verify ID documents
+    // For demo purposes, we'll mark it as verified immediately
+    
+    // Check if verification already exists
+    const checkQuery = 'SELECT * FROM verifications WHERE user_id = $1 AND type = $2';
+    const { rows: existing } = await User.safeQuery(checkQuery, [req.user.id, 'id']);
+    
+    let result;
+    if (existing.length > 0) {
+      // Update existing verification
+      const updateQuery = `
+        UPDATE verifications 
+        SET status = 'verified', verified_at = NOW() 
+        WHERE user_id = $1 AND type = $2
+        RETURNING *
+      `;
+      result = await User.safeQuery(updateQuery, [req.user.id, 'id']);
+    } else {
+      // Create new verification
+      const insertQuery = `
+        INSERT INTO verifications (user_id, type, status, verified_at)
+        VALUES ($1, $2, 'verified', NOW())
+        RETURNING *
+      `;
+      result = await User.safeQuery(insertQuery, [req.user.id, 'id']);
+    }
+    
+    res.status(200).json({ message: 'ID verified successfully' });
+  } catch (err) {
+    console.error('Error verifying ID:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST api/users/verify/bank
+// @desc    Verify user's bank account
+// @access  Private
+router.post('/verify/bank', auth, async (req, res) => {
+  try {
+    const { accountData } = req.body;
+    
+    // In a real implementation, you would verify the bank account details
+    // For demo purposes, we'll mark it as verified immediately
+    
+    // Check if verification already exists
+    const checkQuery = 'SELECT * FROM verifications WHERE user_id = $1 AND type = $2';
+    const { rows: existing } = await User.safeQuery(checkQuery, [req.user.id, 'bank']);
+    
+    let result;
+    if (existing.length > 0) {
+      // Update existing verification
+      const updateQuery = `
+        UPDATE verifications 
+        SET status = 'verified', verified_at = NOW() 
+        WHERE user_id = $1 AND type = $2
+        RETURNING *
+      `;
+      result = await User.safeQuery(updateQuery, [req.user.id, 'bank']);
+    } else {
+      // Create new verification
+      const insertQuery = `
+        INSERT INTO verifications (user_id, type, status, verified_at)
+        VALUES ($1, $2, 'verified', NOW())
+        RETURNING *
+      `;
+      result = await User.safeQuery(insertQuery, [req.user.id, 'bank']);
+    }
+    
+    res.status(200).json({ message: 'Bank account verified successfully' });
+  } catch (err) {
+    console.error('Error verifying bank account:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

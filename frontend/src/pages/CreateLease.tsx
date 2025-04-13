@@ -13,6 +13,7 @@ import { Formik, Form, Field, ErrorMessage, FormikProps, FormikErrors } from 'fo
 import * as Yup from 'yup';
 import LeaseSummary from '../components/LeaseSummary';
 import { Dialog, Transition } from '@headlessui/react';
+import '../styles/CreateLease.css';
 
 interface Property {
   id: number;
@@ -498,13 +499,17 @@ const CreateLease = () => {
       <div className="container mx-auto px-4 py-8 pt-24 max-w-4xl">
         <div className="mb-6 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Create New Lease</h1>
-            <p className="mt-1 text-sm text-gray-500">Complete the form below to create a new lease agreement</p>
+            <h1 className="text-3xl font-bold text-gray-900 bg-gradient-to-r from-emerald-600 to-emerald-800 bg-clip-text text-transparent">
+              {editMode ? 'Edit Lease' : 'Create New Lease'}
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Complete the form below to {editMode ? 'edit' : 'create'} a lease agreement
+            </p>
           </div>
           <button
             type="button"
             onClick={handleCancel}
-            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200"
           >
             <XMarkIcon className="h-4 w-4 mr-1" />
             Cancel
@@ -514,31 +519,31 @@ const CreateLease = () => {
         {/* Progress Steps */}
         <div className="mb-8">
           <div className="flex items-center">
-            <div className={`flex items-center justify-center h-8 w-8 rounded-full ${step >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+            <div className={`flex items-center justify-center h-10 w-10 rounded-full ${step >= 1 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg' : 'bg-gray-200 text-gray-600'}`}>
               1
             </div>
-            <div className={`flex-1 h-1 mx-2 ${step >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-            <div className={`flex items-center justify-center h-8 w-8 rounded-full ${step >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+            <div className={`flex-1 h-1 mx-2 ${step >= 2 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : 'bg-gray-200'}`}></div>
+            <div className={`flex items-center justify-center h-10 w-10 rounded-full ${step >= 2 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg' : 'bg-gray-200 text-gray-600'}`}>
               2
             </div>
-            <div className={`flex-1 h-1 mx-2 ${step >= 3 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-            <div className={`flex items-center justify-center h-8 w-8 rounded-full ${step >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+            <div className={`flex-1 h-1 mx-2 ${step >= 3 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : 'bg-gray-200'}`}></div>
+            <div className={`flex items-center justify-center h-10 w-10 rounded-full ${step >= 3 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg' : 'bg-gray-200 text-gray-600'}`}>
               3
             </div>
-            <div className={`flex-1 h-1 mx-2 ${step >= 4 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-            <div className={`flex items-center justify-center h-8 w-8 rounded-full ${step >= 4 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+            <div className={`flex-1 h-1 mx-2 ${step >= 4 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : 'bg-gray-200'}`}></div>
+            <div className={`flex items-center justify-center h-10 w-10 rounded-full ${step >= 4 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg' : 'bg-gray-200 text-gray-600'}`}>
               4
             </div>
-            <div className={`flex-1 h-1 mx-2 ${step >= 5 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-            <div className={`flex items-center justify-center h-8 w-8 rounded-full ${step >= 5 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+            <div className={`flex-1 h-1 mx-2 ${step >= 5 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : 'bg-gray-200'}`}></div>
+            <div className={`flex items-center justify-center h-10 w-10 rounded-full ${step >= 5 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg' : 'bg-gray-200 text-gray-600'}`}>
               5
             </div>
-            <div className={`flex-1 h-1 mx-2 ${step >= 6 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-            <div className={`flex items-center justify-center h-8 w-8 rounded-full ${step >= 6 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+            <div className={`flex-1 h-1 mx-2 ${step >= 6 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : 'bg-gray-200'}`}></div>
+            <div className={`flex items-center justify-center h-10 w-10 rounded-full ${step >= 6 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg' : 'bg-gray-200 text-gray-600'}`}>
               6
             </div>
           </div>
-          <div className="flex justify-between mt-2 text-xs font-medium">
+          <div className="flex justify-between mt-2 text-xs text-gray-500">
             <span>Parties</span>
             <span>Property</span>
             <span>Terms</span>
@@ -573,134 +578,120 @@ const CreateLease = () => {
             };
             
             return (
-              <Form>
+              <Form className="form-container">
                 {/* Step 1: Parties to the Agreement */}
                 {step === 1 && (
-                  <div className="bg-white shadow rounded-lg p-6">
-                    <h2 className="text-xl font-semibold mb-4">Parties to the Agreement</h2>
-                    
-                    {/* Landlord Information */}
-                    <div className="mb-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-3">Landlord Information</h3>
-                      <div className="bg-gray-50 p-4 rounded-md">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label htmlFor="landlord.full_name" className="block text-sm font-medium text-gray-700 mb-1">
-                              Full Name <span className="text-red-500">*</span>
-                            </label>
-                            <Field
-                              type="text"
-                              name="landlord.full_name"
-                              id="landlord.full_name"
-                              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                            />
-                            <ErrorMessage name="landlord.full_name" component="div" className="mt-1 text-sm text-red-600" />
-                          </div>
-                          
-                          <div>
-                            <label htmlFor="landlord.tc_id" className="block text-sm font-medium text-gray-700 mb-1">
-                              TC ID <span className="text-red-500">*</span>
-                            </label>
-                            <Field
-                              type="text"
-                              name="landlord.tc_id"
-                              id="landlord.tc_id"
-                              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                            />
-                            <ErrorMessage name="landlord.tc_id" component="div" className="mt-1 text-sm text-red-600" />
-                          </div>
-                          
-                          <div>
-                            <label htmlFor="landlord.email" className="block text-sm font-medium text-gray-700 mb-1">
-                              Email <span className="text-red-500">*</span>
-                            </label>
-                            <Field
-                              type="email"
-                              name="landlord.email"
-                              id="landlord.email"
-                              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                            />
-                            <ErrorMessage name="landlord.email" component="div" className="mt-1 text-sm text-red-600" />
-                          </div>
-                          
-                          <div>
-                            <label htmlFor="landlord.phone" className="block text-sm font-medium text-gray-700 mb-1">
-                              Phone <span className="text-red-500">*</span>
-                            </label>
-                            <Field
-                              type="text"
-                              name="landlord.phone"
-                              id="landlord.phone"
-                              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                            />
-                            <ErrorMessage name="landlord.phone" component="div" className="mt-1 text-sm text-red-600" />
-                          </div>
+                  <div className="space-y-6">
+                    <div className="bg-gray-50 rounded-xl p-6 shadow-sm">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Landlord Information</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="form-group">
+                          <label htmlFor="landlord.full_name" className="form-label">
+                            Full Name <span className="text-red-500">*</span>
+                          </label>
+                          <Field
+                            type="text"
+                            name="landlord.full_name"
+                            id="landlord.full_name"
+                            className="form-input"
+                          />
+                          <ErrorMessage name="landlord.full_name" component="div" className="mt-1 text-sm text-red-600" />
+                        </div>
+                        
+                        <div className="form-group">
+                          <label htmlFor="landlord.tc_id" className="form-label">
+                            TC ID <span className="text-red-500">*</span>
+                          </label>
+                          <Field
+                            type="text"
+                            name="landlord.tc_id"
+                            id="landlord.tc_id"
+                            className="form-input"
+                          />
+                          <ErrorMessage name="landlord.tc_id" component="div" className="mt-1 text-sm text-red-600" />
+                        </div>
+                        
+                        <div className="form-group">
+                          <label htmlFor="landlord.email" className="form-label">
+                            Email <span className="text-red-500">*</span>
+                          </label>
+                          <Field
+                            type="email"
+                            name="landlord.email"
+                            id="landlord.email"
+                            className="form-input"
+                          />
+                          <ErrorMessage name="landlord.email" component="div" className="mt-1 text-sm text-red-600" />
+                        </div>
+                        
+                        <div className="form-group">
+                          <label htmlFor="landlord.phone" className="form-label">
+                            Phone <span className="text-red-500">*</span>
+                          </label>
+                          <Field
+                            type="tel"
+                            name="landlord.phone"
+                            id="landlord.phone"
+                            className="form-input"
+                          />
+                          <ErrorMessage name="landlord.phone" component="div" className="mt-1 text-sm text-red-600" />
                         </div>
                       </div>
                     </div>
-                    
-                    {/* Tenant Information */}
-                    <div className="mb-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-3">Tenant Information</h3>
-                      <div className="bg-gray-50 p-4 rounded-md">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label htmlFor="tenant.full_name" className="block text-sm font-medium text-gray-700 mb-1">
-                              Full Name <span className="text-red-500">*</span>
-                            </label>
-                            <Field
-                              type="text"
-                              name="tenant.full_name"
-                              id="tenant.full_name"
-                              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                            />
-                            <ErrorMessage name="tenant.full_name" component="div" className="mt-1 text-sm text-red-600" />
-                          </div>
-                          
-                          <div>
-                            <label htmlFor="tenant.tc_id" className="block text-sm font-medium text-gray-700 mb-1">
-                              TC ID <span className="text-red-500">*</span>
-                            </label>
-                            <Field
-                              type="text"
-                              name="tenant.tc_id"
-                              id="tenant.tc_id"
-                              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                            />
-                            <ErrorMessage name="tenant.tc_id" component="div" className="mt-1 text-sm text-red-600" />
-                          </div>
-                          
-                          <div>
-                            <label htmlFor="tenant.email" className="block text-sm font-medium text-gray-700 mb-1">
-                              Email <span className="text-red-500">*</span>
-                            </label>
-                            <Field
-                              type="email"
-                              name="tenant.email"
-                              id="tenant.email"
-                              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                            />
-                            <ErrorMessage name="tenant.email" component="div" className="mt-1 text-sm text-red-600" />
-                          </div>
-                          
-                          <div>
-                            <label htmlFor="tenant.phone" className="block text-sm font-medium text-gray-700 mb-1">
-                              Phone <span className="text-red-500">*</span>
-                            </label>
-                            <Field
-                              type="text"
-                              name="tenant.phone"
-                              id="tenant.phone"
-                              className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                            />
-                            <ErrorMessage name="tenant.phone" component="div" className="mt-1 text-sm text-red-600" />
-                          </div>
+
+                    <div className="bg-gray-50 rounded-xl p-6 shadow-sm">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Tenant Information</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="form-group">
+                          <label htmlFor="tenant.full_name" className="form-label">
+                            Full Name <span className="text-red-500">*</span>
+                          </label>
+                          <Field
+                            type="text"
+                            name="tenant.full_name"
+                            id="tenant.full_name"
+                            className="form-input"
+                          />
+                          <ErrorMessage name="tenant.full_name" component="div" className="mt-1 text-sm text-red-600" />
                         </div>
                         
-                        <div className="mt-4">
-                          <p className="text-sm text-gray-500">
-                            You can select an existing tenant from your contacts or enter the details manually. If the tenant is already registered, they'll receive a notification to review the lease.
-                          </p>
+                        <div className="form-group">
+                          <label htmlFor="tenant.tc_id" className="form-label">
+                            TC ID <span className="text-red-500">*</span>
+                          </label>
+                          <Field
+                            type="text"
+                            name="tenant.tc_id"
+                            id="tenant.tc_id"
+                            className="form-input"
+                          />
+                          <ErrorMessage name="tenant.tc_id" component="div" className="mt-1 text-sm text-red-600" />
+                        </div>
+                        
+                        <div className="form-group">
+                          <label htmlFor="tenant.email" className="form-label">
+                            Email <span className="text-red-500">*</span>
+                          </label>
+                          <Field
+                            type="email"
+                            name="tenant.email"
+                            id="tenant.email"
+                            className="form-input"
+                          />
+                          <ErrorMessage name="tenant.email" component="div" className="mt-1 text-sm text-red-600" />
+                        </div>
+                        
+                        <div className="form-group">
+                          <label htmlFor="tenant.phone" className="form-label">
+                            Phone <span className="text-red-500">*</span>
+                          </label>
+                          <Field
+                            type="tel"
+                            name="tenant.phone"
+                            id="tenant.phone"
+                            className="form-input"
+                          />
+                          <ErrorMessage name="tenant.phone" component="div" className="mt-1 text-sm text-red-600" />
                         </div>
                       </div>
                     </div>
@@ -709,47 +700,44 @@ const CreateLease = () => {
                 
                 {/* Step 2: Property Details */}
                 {step === 2 && (
-                  <div className="bg-white shadow rounded-lg p-6">
-                    <h2 className="text-xl font-semibold mb-4">Property Details</h2>
-                    
+                  <div className="bg-gray-50 rounded-xl p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Property Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="md:col-span-2">
-                        <label htmlFor="property_name" className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="form-group md:col-span-2">
+                        <label htmlFor="property_name" className="form-label">
                           Property Name <span className="text-red-500">*</span>
                         </label>
                         <Field
                           type="text"
                           name="property_name"
                           id="property_name"
-                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                          placeholder="Name of the property"
+                          className="form-input"
                         />
                         <ErrorMessage name="property_name" component="div" className="mt-1 text-sm text-red-600" />
                       </div>
                       
-                      <div className="md:col-span-2">
-                        <label htmlFor="property_address" className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="form-group md:col-span-2">
+                        <label htmlFor="property_address" className="form-label">
                           Property Address <span className="text-red-500">*</span>
                         </label>
                         <Field
                           type="text"
                           name="property_address"
                           id="property_address"
-                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                          placeholder="Full property address"
+                          className="form-input"
                         />
                         <ErrorMessage name="property_address" component="div" className="mt-1 text-sm text-red-600" />
                       </div>
                       
-                      <div>
-                        <label htmlFor="property_type" className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="form-group">
+                        <label htmlFor="property_type" className="form-label">
                           Property Type <span className="text-red-500">*</span>
                         </label>
                         <Field
                           as="select"
                           name="property_type"
                           id="property_type"
-                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                          className="form-select"
                         >
                           <option value="">Select type</option>
                           <option value="apartment">Apartment</option>
@@ -763,29 +751,28 @@ const CreateLease = () => {
                         <ErrorMessage name="property_type" component="div" className="mt-1 text-sm text-red-600" />
                       </div>
                       
-                      <div>
-                        <label htmlFor="apartment_no" className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="form-group">
+                        <label htmlFor="apartment_no" className="form-label">
                           Apartment/Unit Number
                         </label>
                         <Field
                           type="text"
                           name="apartment_no"
                           id="apartment_no"
-                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                          placeholder="Unit number, apartment, etc."
+                          className="form-input"
                         />
                         <ErrorMessage name="apartment_no" component="div" className="mt-1 text-sm text-red-600" />
                       </div>
                       
-                      <div>
-                        <label htmlFor="property_usage" className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="form-group">
+                        <label htmlFor="property_usage" className="form-label">
                           Property Usage <span className="text-red-500">*</span>
                         </label>
                         <Field
                           as="select"
                           name="property_usage"
                           id="property_usage"
-                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                          className="form-select"
                         >
                           <option value="residential">Residential</option>
                           <option value="commercial">Commercial</option>
@@ -794,16 +781,15 @@ const CreateLease = () => {
                         <ErrorMessage name="property_usage" component="div" className="mt-1 text-sm text-red-600" />
                       </div>
                       
-                      <div>
-                        <label htmlFor="property_size" className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="form-group">
+                        <label htmlFor="property_size" className="form-label">
                           Property Size (m²) <span className="text-red-500">*</span>
                         </label>
                         <Field
                           type="text"
                           name="property_size"
                           id="property_size"
-                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                          placeholder="Size in square meters"
+                          className="form-input"
                         />
                         <ErrorMessage name="property_size" component="div" className="mt-1 text-sm text-red-600" />
                       </div>
@@ -813,41 +799,39 @@ const CreateLease = () => {
                 
                 {/* Step 3: Lease Terms */}
                 {step === 3 && (
-                  <div className="bg-white shadow rounded-lg p-6">
-                    <h2 className="text-xl font-semibold mb-4">Lease Terms</h2>
+                  <div className="bg-gray-50 rounded-xl p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Lease Terms</h3>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label htmlFor="monthly_rent" className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="form-group">
+                        <label htmlFor="monthly_rent" className="form-label">
                           Monthly Rent <span className="text-red-500">*</span>
                         </label>
-                        <div className="mt-1 relative rounded-md shadow-sm">
+                        <div className="rent-input-wrapper">
                           <Field
                             type="number"
                             name="monthly_rent"
                             id="monthly_rent"
-                            className="focus:ring-blue-500 focus:border-blue-500 block w-full pr-12 sm:text-sm border-gray-300 rounded-md"
+                            className="form-input"
                             placeholder="0.00"
                             step="0.01"
                           />
-                          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                            <span className="text-gray-500 sm:text-sm">
-                              {values.currency}
-                            </span>
-                          </div>
+                          <span className="currency-indicator">
+                            {values.currency}
+                          </span>
                         </div>
                         <ErrorMessage name="monthly_rent" component="div" className="mt-1 text-sm text-red-600" />
                       </div>
                       
-                      <div>
-                        <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="form-group">
+                        <label htmlFor="currency" className="form-label">
                           Currency <span className="text-red-500">*</span>
                         </label>
                         <Field
                           as="select"
                           name="currency"
                           id="currency"
-                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                          className="form-select"
                         >
                           <option value="TRY">Turkish Lira (TRY)</option>
                           <option value="USD">US Dollar (USD)</option>
@@ -856,8 +840,8 @@ const CreateLease = () => {
                         <ErrorMessage name="currency" component="div" className="mt-1 text-sm text-red-600" />
                       </div>
                       
-                      <div>
-                        <label htmlFor="payment_day" className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="form-group">
+                        <label htmlFor="payment_day" className="form-label">
                           Payment Day <span className="text-red-500">*</span>
                         </label>
                         <Field
@@ -866,21 +850,21 @@ const CreateLease = () => {
                           id="payment_day"
                           min="1"
                           max="28"
-                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                          className="form-input"
                         />
                         <ErrorMessage name="payment_day" component="div" className="mt-1 text-sm text-red-600" />
                         <p className="mt-1 text-xs text-gray-500">Day of the month when rent is due (1-28)</p>
                       </div>
                       
-                      <div>
-                        <label htmlFor="payment_method" className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="form-group">
+                        <label htmlFor="payment_method" className="form-label">
                           Payment Method <span className="text-red-500">*</span>
                         </label>
                         <Field
                           as="select"
                           name="payment_method"
                           id="payment_method"
-                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                          className="form-select"
                         >
                           <option value="bank_transfer">Bank Transfer</option>
                           <option value="cash">Cash</option>
@@ -890,26 +874,22 @@ const CreateLease = () => {
                         <ErrorMessage name="payment_method" component="div" className="mt-1 text-sm text-red-600" />
                       </div>
                       
-                      <div>
-                        <label htmlFor="start_date" className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="form-group">
+                        <label htmlFor="start_date" className="form-label">
                           Start Date <span className="text-red-500">*</span>
                         </label>
                         <Field
                           type="date"
                           name="start_date"
                           id="start_date"
-                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                          className="form-input"
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                            // Set the value in Formik
                             setFieldValue('start_date', e.target.value);
-                            
-                            // Calculate and display duration if both dates are set
                             if (e.target.value && values.end_date) {
                               const startDate = new Date(e.target.value);
                               const endDate = new Date(values.end_date);
                               const durationInMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
-                                                      (endDate.getMonth() - startDate.getMonth());
-                              // This is just for display, we'll calculate it again during submission
+                                                    (endDate.getMonth() - startDate.getMonth());
                               setLeaseDuration(durationInMonths);
                             }
                           }}
@@ -917,26 +897,22 @@ const CreateLease = () => {
                         <ErrorMessage name="start_date" component="div" className="mt-1 text-sm text-red-600" />
                       </div>
                       
-                      <div>
-                        <label htmlFor="end_date" className="block text-sm font-medium text-gray-700 mb-1">
+                      <div className="form-group">
+                        <label htmlFor="end_date" className="form-label">
                           End Date <span className="text-red-500">*</span>
                         </label>
                         <Field
                           type="date"
                           name="end_date"
                           id="end_date"
-                          className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                          className="form-input"
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                            // Set the value in Formik
                             setFieldValue('end_date', e.target.value);
-                            
-                            // Calculate and display duration if both dates are set
                             if (values.start_date && e.target.value) {
                               const startDate = new Date(values.start_date);
                               const endDate = new Date(e.target.value);
                               const durationInMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
-                                                      (endDate.getMonth() - startDate.getMonth());
-                              // This is just for display, we'll calculate it again during submission
+                                                    (endDate.getMonth() - startDate.getMonth());
                               setLeaseDuration(durationInMonths);
                             }
                           }}
@@ -1100,7 +1076,7 @@ const CreateLease = () => {
                         name="additional_terms.custom_terms"
                         id="custom_terms"
                         rows={6}
-                        className="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        className="form-textarea"
                         placeholder="Enter any additional terms, rules, or special conditions..."
                       />
                       <ErrorMessage name="additional_terms.custom_terms" component="div" className="mt-1 text-sm text-red-600" />
@@ -1235,11 +1211,11 @@ const CreateLease = () => {
                 )}
                 
                 {/* Navigation buttons */}
-                <div className="mt-6 flex justify-between">
+                <div className="mt-8 flex justify-between">
                   {step > 1 && (
                     <button
                       type="button"
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      className="inline-flex items-center px-6 py-3 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200"
                       onClick={() => stepBack()}
                       disabled={isSubmitting}
                     >
@@ -1249,13 +1225,13 @@ const CreateLease = () => {
                   )}
                   
                   {step === 1 && (
-                    <div></div> // Empty div to maintain flex layout
+                    <div></div>
                   )}
                   
                   {step < 5 && (
                     <button
                       type="button"
-                      className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      className="inline-flex items-center px-6 py-3 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200 transform hover:scale-105"
                       onClick={() => stepForward(formikProps)}
                     >
                       Next
@@ -1266,7 +1242,7 @@ const CreateLease = () => {
                   {step === 5 && (
                     <button
                       type="button"
-                      className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      className="inline-flex items-center px-6 py-3 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200 transform hover:scale-105"
                       onClick={() => {
                         setStep(6);
                       }}
@@ -1279,7 +1255,7 @@ const CreateLease = () => {
                   {step === 6 && !success && (
                     <button
                       type="submit"
-                      className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                      className="inline-flex items-center px-6 py-3 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200 transform hover:scale-105"
                       disabled={isSubmitting}
                     >
                       {isSubmitting ? 'Creating...' : 'Create Lease'}
@@ -1290,7 +1266,7 @@ const CreateLease = () => {
                   {step === 6 && success && (
                     <button
                       type="button"
-                      className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      className="inline-flex items-center px-6 py-3 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200 transform hover:scale-105"
                       onClick={navigateToLeaseDetails}
                     >
                       View Lease Details
