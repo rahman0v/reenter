@@ -66,22 +66,16 @@ const LeasePrintModal: React.FC<LeasePrintModalProps> = ({
     // Define property description with fallback
     const propertyDescription = (lease.template_data as any)?.property_description || 'Residential property as specified above';
     
-    // Handle utilities included
-    const hasUtilities = (lease.template_data as any)?.utilities_included && (lease.template_data as any).utilities_included.length > 0;
-    
-    // Handle additional terms
-    const hasAdditionalTerms = (lease.template_data as any)?.additional_terms ? true : false;
-    
-    // Handle section numbering
-    const policiesSectionNumber = hasUtilities ? '6' : '5';
-    const additionalTermsSectionNumber = hasUtilities ? '7' : '6';
-    const legalProvisionsSectionNumber = hasUtilities ? 
-      (hasAdditionalTerms ? '8' : '7') : 
-      (hasAdditionalTerms ? '7' : '6');
+    // Use fixed section numbering
+    const policiesSectionNumber = '6';
+    const additionalTermsSectionNumber = '7';
+    const legalProvisionsSectionNumber = '8';
     
     // Utility function to safely format utilities
     const formatUtilities = () => {
-      if (!hasUtilities) return '';
+      if (!lease.template_data || !lease.template_data.utilities_included || lease.template_data.utilities_included.length === 0) {
+        return '<span class="text-gray-500">No utilities included in rent</span>';
+      }
       
       const utilities = (lease.template_data as any).utilities_included;
       return utilities.map((utility: string) => `<span class="tag">${utility}</span>`).join('');
@@ -383,54 +377,52 @@ const LeasePrintModal: React.FC<LeasePrintModalProps> = ({
               </div>
             </div>
             
-            ${hasUtilities ? `
-              <div class="section">
-                <h2>5. UTILITIES</h2>
-                <div class="section-content">
-                  <div class="row">
-                    <div class="label">Utilities Included in Rent:</div>
-                    <div class="value">
-                      ${formatUtilities()}
-                      <p>All other utilities shall be the responsibility of the Tenant.</p>
-                    </div>
+            <div class="section">
+              <h2>5. UTILITIES</h2>
+              <div class="section-content">
+                <div class="row">
+                  <div class="label">Utilities Included in Rent:</div>
+                  <div class="value">
+                    ${formatUtilities()}
+                    <p>All utilities not explicitly included shall be the responsibility of the Tenant.</p>
                   </div>
                 </div>
               </div>
-            ` : ''}
+            </div>
             
-            ${lease.template_data ? `
-              <div class="section">
-                <h2>${policiesSectionNumber}. POLICIES</h2>
-                <div class="section-content">
-                  <div class="row">
-                    <div class="label">Pets Allowed:</div>
-                    <div class="value">${(lease.template_data as any).pets_allowed ? 'Yes' : 'No'}</div>
-                  </div>
-                  <div class="row">
-                    <div class="label">Smoking Allowed:</div>
-                    <div class="value">${(lease.template_data as any).smoking_allowed ? 'Yes' : 'No'}</div>
-                  </div>
-                  ${(lease.template_data as any).sublease_allowed !== undefined ? `
-                  <div class="row">
-                    <div class="label">Sublease Allowed:</div>
-                    <div class="value">${(lease.template_data as any).sublease_allowed ? 'Yes' : 'No'}</div>
-                  </div>
-                  ` : ''}
+            <div class="section">
+              <h2>${policiesSectionNumber}. POLICIES</h2>
+              <div class="section-content">
+                <div class="row">
+                  <div class="label">Pets Allowed:</div>
+                  <div class="value">${(lease.template_data as any)?.pets_allowed ? 'Yes' : 'No'}</div>
                 </div>
+                <div class="row">
+                  <div class="label">Smoking Allowed:</div>
+                  <div class="value">${(lease.template_data as any)?.smoking_allowed ? 'Yes' : 'No'}</div>
+                </div>
+                ${(lease.template_data as any)?.sublease_allowed !== undefined ? `
+                <div class="row">
+                  <div class="label">Sublease Allowed:</div>
+                  <div class="value">${(lease.template_data as any)?.sublease_allowed ? 'Yes' : 'No'}</div>
+                </div>
+                ` : ''}
               </div>
-            ` : ''}
+            </div>
             
-            ${hasAdditionalTerms ? `
-              <div class="section">
-                <h2>${additionalTermsSectionNumber}. ADDITIONAL TERMS</h2>
-                <div class="section-content">
-                  <div class="row">
-                    <div class="label">Additional Terms & Conditions:</div>
-                    <div class="value white-space-pre">${(lease.template_data as any).additional_terms}</div>
+            <div class="section">
+              <h2>${additionalTermsSectionNumber}. ADDITIONAL TERMS</h2>
+              <div class="section-content">
+                <div class="row">
+                  <div class="label">Additional Terms & Conditions:</div>
+                  <div class="value white-space-pre">
+                    ${(lease.template_data as any)?.additional_terms ? 
+                      (lease.template_data as any).additional_terms : 
+                      '<span class="text-gray-500">No additional terms specified</span>'}
                   </div>
                 </div>
               </div>
-            ` : ''}
+            </div>
             
             <div class="section">
               <h2>${legalProvisionsSectionNumber}. LEGAL PROVISIONS</h2>
@@ -620,51 +612,40 @@ const LeasePrintModal: React.FC<LeasePrintModalProps> = ({
                     <p><strong>ReEnter Fee:</strong> 8.5% of monthly rent ({formatCurrency(lease.monthly_rent * 0.085, lease.currency)})</p>
                   </div>
                   
-                  {(lease.template_data as any)?.utilities_included && (lease.template_data as any).utilities_included.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-lg font-semibold border-b pb-2 mb-3">5. UTILITIES INCLUDED</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {(lease.template_data as any).utilities_included.map((utility: string, idx: number) => (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold border-b pb-2 mb-3">5. UTILITIES</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {(lease.template_data as any)?.utilities_included && (lease.template_data as any).utilities_included.length > 0 ? (
+                        (lease.template_data as any).utilities_included.map((utility: string, idx: number) => (
                           <span key={idx} className="bg-gray-100 px-2 py-1 rounded text-sm">{utility}</span>
-                        ))}
-                      </div>
-                      <p className="text-sm mt-2">All other utilities shall be the responsibility of the Tenant.</p>
-                    </div>
-                  )}
-                  
-                  {lease.template_data && (
-                    <div className="mb-6">
-                      <h3 className="text-lg font-semibold border-b pb-2 mb-3">
-                        {(lease.template_data as any)?.utilities_included && 
-                         (lease.template_data as any).utilities_included.length > 0 ? '6' : '5'}. POLICIES
-                      </h3>
-                      <p><strong>Pets Allowed:</strong> {(lease.template_data as any).pets_allowed ? 'Yes' : 'No'}</p>
-                      <p><strong>Smoking Allowed:</strong> {(lease.template_data as any).smoking_allowed ? 'Yes' : 'No'}</p>
-                      {(lease.template_data as any).sublease_allowed !== undefined && (
-                        <p><strong>Sublease Allowed:</strong> {(lease.template_data as any).sublease_allowed ? 'Yes' : 'No'}</p>
+                        ))
+                      ) : (
+                        <span className="text-gray-500">No utilities included in rent</span>
                       )}
                     </div>
-                  )}
-                  
-                  {(lease.template_data as any)?.additional_terms && (
-                    <div className="mb-6">
-                      <h3 className="text-lg font-semibold border-b pb-2 mb-3">
-                        {(lease.template_data as any)?.utilities_included && 
-                         (lease.template_data as any).utilities_included.length > 0 ? '7' : '6'}. ADDITIONAL TERMS
-                      </h3>
-                      <div className="whitespace-pre-wrap bg-gray-50 p-3 rounded border">
-                        {(lease.template_data as any).additional_terms}
-                      </div>
-                    </div>
-                  )}
+                    <p className="text-sm mt-2">All utilities not explicitly included shall be the responsibility of the Tenant.</p>
+                  </div>
                   
                   <div className="mb-6">
-                    <h3 className="text-lg font-semibold border-b pb-2 mb-3">
-                      {(lease.template_data as any)?.utilities_included && 
-                       (lease.template_data as any).utilities_included.length > 0 ? 
-                        ((lease.template_data as any)?.additional_terms ? '8' : '7') : 
-                        ((lease.template_data as any)?.additional_terms ? '7' : '6')}. LEGAL PROVISIONS
-                    </h3>
+                    <h3 className="text-lg font-semibold border-b pb-2 mb-3">6. POLICIES</h3>
+                    <p><strong>Pets Allowed:</strong> {(lease.template_data as any)?.pets_allowed ? 'Yes' : 'No'}</p>
+                    <p><strong>Smoking Allowed:</strong> {(lease.template_data as any)?.smoking_allowed ? 'Yes' : 'No'}</p>
+                    {(lease.template_data as any)?.sublease_allowed !== undefined && (
+                      <p><strong>Sublease Allowed:</strong> {(lease.template_data as any)?.sublease_allowed ? 'Yes' : 'No'}</p>
+                    )}
+                  </div>
+                  
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold border-b pb-2 mb-3">7. ADDITIONAL TERMS</h3>
+                    <div className="whitespace-pre-wrap bg-gray-50 p-3 rounded border">
+                      {(lease.template_data as any)?.additional_terms ? (lease.template_data as any).additional_terms : (
+                        <span className="text-gray-500">No additional terms specified</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold border-b pb-2 mb-3">8. LEGAL PROVISIONS</h3>
                     <div className="space-y-4">
                       <div>
                         <p className="font-semibold">Standard Terms:</p>
