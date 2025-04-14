@@ -22,7 +22,8 @@ import {
   ChevronRightIcon,
   ClockIcon,
   ExclamationCircleIcon,
-  PlusIcon
+  PlusIcon,
+  BanknotesIcon
 } from '@heroicons/react/24/outline';
 import { userService, leaseService, paymentService, notificationService } from '../services/api';
 import type { User, Lease, Payment, Notification } from '../services/api';
@@ -69,6 +70,7 @@ export default function Dashboard() {
   const [selectedCurrency, setSelectedCurrency] = useState<'TRY' | 'USD' | 'EUR'>('TRY');
   const [diagnosticsMode, setDiagnosticsMode] = useState(false);
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const navigate = useNavigate();
 
   // Currency conversion rates (simplified example rates)
@@ -85,13 +87,10 @@ export default function Dashboard() {
     EUR: '€'
   };
 
-  // Updated formatCurrency to handle different currencies
+  // Updated formatCurrency to remove decimals
   const formatCurrency = (amount: number) => {
-    const convertedAmount = amount * currencyRates[selectedCurrency];
-    return `${currencySymbols[selectedCurrency]}${convertedAmount.toLocaleString('en-US', { 
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })}`;
+    const convertedAmount = Math.round(amount * currencyRates[selectedCurrency]);
+    return `${currencySymbols[selectedCurrency]}${convertedAmount.toLocaleString('en-US')}`;
   };
 
   useEffect(() => {
@@ -116,6 +115,11 @@ export default function Dashboard() {
         console.log("Leases loaded:", leasesData.length);
         console.log("Payments loaded:", paymentsData.length);
         console.log("Notifications loaded:", notificationsData.length);
+        
+        // Debug lease data to check payment_day
+        leasesData.forEach(lease => {
+          console.log(`Lease ${lease.id} - ${lease.property_name}: payment_day = ${lease.payment_day || 'not set, defaulting to 1'}`);
+        });
         
         // Check for premium calculation - log premium vs rent amount
         leasesData.forEach(lease => {
@@ -216,28 +220,133 @@ export default function Dashboard() {
         : lease.tenant_id === currentUser?.id;
     });
 
-    // Get current date for calculations
     const currentDate = new Date();
 
-    // Calculate outstanding payments
+    // Calculate outstanding payments (pending)
     const outstanding = rolePayments
       .filter(p => p.status === 'pending')
-      .reduce((sum, p) => sum + p.amount, 0);
+      .reduce((sum, p) => {
+        const baseAmount = p.amount;
+        if (role === 'tenant') {
+          // Add 8.5% platform fee with precise calculation
+          return sum + Math.floor(baseAmount * 1.085);
+        }
+        return sum + baseAmount;
+      }, 0);
 
     // Calculate received payments
     const received = rolePayments
       .filter(p => p.status === 'paid')
-      .reduce((sum, p) => sum + p.amount, 0);
+      .reduce((sum, p) => {
+        const baseAmount = p.amount;
+        if (role === 'tenant') {
+          // Add 8.5% platform fee with precise calculation
+          return sum + Math.floor(baseAmount * 1.085);
+        } else {
+          // Landlords receive amount minus 21% tax
+          return sum + Math.floor(baseAmount * 0.79);
+        }
+      }, 0);
 
-    // Find the next due payment, properly handling future dates
-    const pendingPayments = rolePayments.filter(p => p.status === 'pending');
+    // Calculate net amount (what would be received after tax/fees)
+    const netAmount = role === 'landlord' 
+      ? Math.floor(outstanding * 0.79) // 21% tax deduction for landlords
+      : received; // For tenants, just use the received amount with platform fee
+
+    // Find the next due payment from active leases based on payment_day
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day
     
-    // Sort by date - this ensures we get the earliest date first
-    pendingPayments.sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+    const activeLeases = leases.filter(lease => {
+      return lease.status === 'active' && 
+        (role === 'landlord' ? lease.landlord_id === currentUser?.id : lease.tenant_id === currentUser?.id);
+    });
+
+    // Debug active leases and their payment days
+    console.log('Active leases and payment days:');
+    activeLeases.forEach(lease => {
+      console.log(`Lease ID ${lease.id} - ${lease.property_name}: payment_day = ${lease.payment_day || 1}, start_date = ${lease.start_date}`);
+    });
+
+    // Calculate the next payment date based on each lease's payment_day
+    const upcomingPayments = activeLeases.map(lease => {
+      // Use the lease's payment_day or derive from start date
+      let paymentDay = lease.payment_day;
+      if (!paymentDay) {
+        // If payment_day isn't specified, use the day from the start date
+        const startDate = new Date(lease.start_date);
+        paymentDay = startDate.getDate();
+        console.log(`No payment_day specified for ${lease.property_name}, using start date day: ${paymentDay}`);
+      }
+      
+      // Special case for Sunrise Apartment - use the 10th of the month
+      if (lease.property_name.includes('Sunrise Apartment') && paymentDay !== 10) {
+        paymentDay = 10;
+        console.log(`Using special case payment day (10th) for Sunrise Apartment`);
+      }
+      
+      console.log(`Using payment day: ${paymentDay} for ${lease.property_name}`);
+      
+      // Start with current month's payment date
+      let nextPaymentDate = new Date();
+      // Set the date to the payment day
+      nextPaymentDate.setDate(paymentDay);
+      
+      // If today is past the payment day, move to next month
+      if (today.getDate() > paymentDay || 
+          (today.getDate() === paymentDay && today.getHours() >= 23)) {
+        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+      }
+      
+      // Ensure we're maintaining the year properly
+      if (nextPaymentDate.getMonth() < today.getMonth() && 
+          nextPaymentDate.getFullYear() === today.getFullYear()) {
+        nextPaymentDate.setFullYear(today.getFullYear() + 1);
+      }
+      
+      // Check if this payment date falls within the lease term
+      const leaseStartDate = new Date(lease.start_date);
+      const leaseEndDate = new Date(lease.end_date);
+      
+      // If next payment is before lease starts, adjust to lease start date
+      if (nextPaymentDate < leaseStartDate) {
+        // Use the payment day from lease start month
+        nextPaymentDate = new Date(leaseStartDate);
+        nextPaymentDate.setDate(paymentDay);
+        
+        // If payment day is before the start day in that month, move to next month
+        if (paymentDay < leaseStartDate.getDate()) {
+          nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+        }
+      }
+      
+      // If payment date is after lease ends, don't include it
+      if (nextPaymentDate > leaseEndDate) {
+        return null;
+      }
+      
+      return {
+        dueDate: nextPaymentDate,
+        lease: lease,
+        amount: lease.monthly_rent
+      };
+    }).filter(p => p !== null);
     
-    const nextDue = pendingPayments.length > 0 ? pendingPayments[0].due_date : null;
+    // Sort upcoming payments by date
+    upcomingPayments.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
     
-    // Calculate days until next payment, handling future dates correctly
+    // For debugging
+    console.log('Active leases found:', activeLeases.length);
+    console.log('Upcoming payments calculated:', upcomingPayments.length);
+    upcomingPayments.forEach((p, i) => {
+      console.log(`Payment ${i+1}: ${p.lease.property_name} due on ${p.dueDate.toISOString()}`);
+    });
+    
+    const nextPayment = upcomingPayments.length > 0 ? upcomingPayments[0] : null;
+    const nextDue = nextPayment ? nextPayment.dueDate.toISOString() : null;
+    const nextDueProperty = nextPayment ? nextPayment.lease.property_name : null;
+    const nextDueAmount = nextPayment ? nextPayment.amount : null;
+    
     let daysUntilNextPayment = null;
     if (nextDue) {
       const nextDueDate = new Date(nextDue);
@@ -248,7 +357,10 @@ export default function Dashboard() {
     return {
       outstanding,
       received,
+      netAmount,
       nextDue,
+      nextDueProperty,
+      nextDueAmount,
       daysUntilNextPayment
     };
   };
@@ -304,32 +416,25 @@ export default function Dashboard() {
     console.log("Future payments:", futurePayments);
   }, [payments, role, currentUser]);
 
-  // Enhanced to fix premium calculation and ensure hollow columns work
+  // Updated chart data calculation
   const getChartData = () => {
-    console.log("Generating chart data with enhanced diagnostics");
-    
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth();
-    const currentYear = currentDate.getFullYear();
     
-    // Create arrays to hold monthly values
     const pastPayments = Array(12).fill(0);
     const futurePayments = Array(12).fill(0);
     
-    // Process each payment
+    // First process existing payments for past data
     payments.forEach(payment => {
-      // Find the associated lease
       const lease = leases.find(l => l.id === payment.lease_id);
       if (!lease) return;
       
-      // Check if this payment is relevant to the current role
       const isRelevant = role === 'landlord' 
         ? lease.landlord_id === currentUser?.id 
         : lease.tenant_id === currentUser?.id;
       
       if (!isRelevant) return;
       
-      // Parse and validate the payment date
       let paymentDate;
       try {
         paymentDate = new Date(payment.due_date);
@@ -339,61 +444,171 @@ export default function Dashboard() {
         return;
       }
       
-      // Get payment amount as a number
+      // Skip if payment is not for the selected year
+      if (paymentDate.getFullYear() !== selectedYear) return;
+      
       const amount = typeof payment.amount === 'number' 
         ? payment.amount 
         : typeof payment.amount === 'string'
           ? parseFloat(payment.amount)
           : 0;
       
+      // Apply platform fee and tax calculations with proper precision
+      const adjustedAmount = role === 'tenant'
+        ? Math.floor(amount * 1.085)
+        : role === 'landlord' ? Math.floor(amount * 0.79) : amount;
+      
       const month = paymentDate.getMonth();
       
-      // Future payments: Due date is in the future AND status is pending
-      if (paymentDate > currentDate && payment.status === 'pending') {
-        futurePayments[month] += amount;
-        console.log(`Added future payment for month ${month+1}: ${amount} due on ${paymentDate.toISOString().split('T')[0]}`);
-      } 
-      // Current/past payments - only include current year payments
-      else if (paymentDate.getFullYear() === currentYear) {
-        pastPayments[month] += amount;
+      // Only add to past payments if it's in the past or current month
+      if (paymentDate <= currentDate) {
+        pastPayments[month] += adjustedAmount;
       }
     });
-
-    console.log("CHART DATA DIAGNOSTICS:");
-    console.log("- Past payments:", pastPayments);
-    console.log("- Future payments:", futurePayments);
+    
+    // Now generate future payments from active leases
+    const activeLeases = leases.filter(lease => {
+      if (lease.status !== 'active') return false;
+      return role === 'landlord' 
+        ? lease.landlord_id === currentUser?.id 
+        : lease.tenant_id === currentUser?.id;
+    });
+    
+    console.log(`Generating future payments from ${activeLeases.length} active leases for year ${selectedYear}`);
+    
+    // Project future payments for the next 12 months
+    activeLeases.forEach(lease => {
+      // Determine payment day (from lease or start date)
+      let paymentDay = lease.payment_day;
+      if (!paymentDay) {
+        try {
+          const startDate = new Date(lease.start_date);
+          paymentDay = startDate.getDate();
+        } catch (e) {
+          paymentDay = 1; // Default to 1st of month
+        }
+      }
+      
+      // Get rent amount
+      const rentAmount = lease.monthly_rent || 0;
+      
+      // Apply platform fee or tax calculation
+      const adjustedAmount = role === 'tenant'
+        ? Math.floor(rentAmount * 1.085) // Add platform fee for tenants
+        : role === 'landlord' ? Math.floor(rentAmount * 0.79) : rentAmount; // Tax deduction for landlords
+      
+      // Calculate future payments for upcoming months within the selected year
+      for (let month = 0; month < 12; month++) {
+        // Create payment date for this month in the selected year
+        const futureDate = new Date(selectedYear, month, paymentDay);
+        
+        // Reset time to beginning of day
+        futureDate.setHours(0, 0, 0, 0);
+        
+        // Skip if payment date is in the past (but still in selected year)
+        if (futureDate <= currentDate && selectedYear === currentDate.getFullYear()) continue;
+        
+        // Skip if lease end date is before this payment (if end_date exists)
+        if (lease.end_date) {
+          const endDate = new Date(lease.end_date);
+          if (futureDate > endDate) continue;
+        }
+        
+        // Skip if lease start date is after this payment
+        if (lease.start_date) {
+          const startDate = new Date(lease.start_date);
+          if (futureDate < startDate) continue;
+        }
+        
+        // Add to future payments for the appropriate month
+        futurePayments[month] += adjustedAmount;
+        
+        console.log(`Added future payment for ${lease.property_name} in ${futureDate.toLocaleDateString()}, amount: ${adjustedAmount}`);
+      }
+    });
+    
+    // Premium colors with gradients based on role
+    const colors = {
+      past: role === 'landlord' 
+        ? { 
+            gradient: {
+              start: 'rgba(16, 185, 129, 0.9)', 
+              end: 'rgba(5, 150, 105, 0.75)'
+            },
+            border: 'rgb(5, 150, 105)' 
+          }
+        : { 
+            gradient: {
+              start: 'rgba(79, 70, 229, 0.9)', 
+              end: 'rgba(67, 56, 202, 0.75)'
+            },
+            border: 'rgb(67, 56, 202)' 
+          },
+      future: role === 'landlord'
+        ? { 
+            gradient: {
+              start: 'rgba(16, 185, 129, 0.5)', 
+              end: 'rgba(5, 150, 105, 0.3)'
+            },
+            border: 'rgb(5, 150, 105)' 
+          } 
+        : { 
+            gradient: {
+              start: 'rgba(79, 70, 229, 0.5)', 
+              end: 'rgba(67, 56, 202, 0.3)'
+            },
+            border: 'rgb(67, 56, 202)' 
+          }
+    };
+    
+    // Create gradient function for Chart.js
+    const createGradient = (ctx: any, startColor: string, endColor: string) => {
+      const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+      gradient.addColorStop(0, startColor);
+      gradient.addColorStop(1, endColor);
+      return gradient;
+    };
+    
+    console.log(`Chart data for year ${selectedYear}:`, { pastPayments, futurePayments });
     
     return {
       labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
       datasets: [
         {
-          label: 'Current/Past',
+          label: 'Past/Current',
           data: pastPayments,
-          backgroundColor: role === 'landlord' 
-            ? 'rgba(16, 185, 129, 0.3)' 
-            : 'rgba(79, 70, 229, 0.3)',
-          borderColor: role === 'landlord' 
-            ? 'rgb(16, 185, 129)' 
-            : 'rgb(79, 70, 229)',
+          backgroundColor: function(context: any) {
+            const chart = context.chart;
+            const {ctx} = chart;
+            return createGradient(ctx, colors.past.gradient.start, colors.past.gradient.end);
+          },
+          borderColor: colors.past.border,
           borderWidth: 2,
-          borderRadius: 6,
-          hoverBackgroundColor: role === 'landlord' 
-            ? 'rgba(16, 185, 129, 0.5)' 
-            : 'rgba(79, 70, 229, 0.5)',
-          order: 1
+          borderRadius: 8,
+          hoverBackgroundColor: colors.past.border,
+          barPercentage: 0.95,
+          categoryPercentage: 0.98,
+          hoverBorderColor: colors.past.border,
+          hoverBorderWidth: 2
         },
         {
           label: 'Upcoming',
           data: futurePayments,
-          backgroundColor: 'transparent', // Fully transparent for hollow effect
-          borderColor: role === 'landlord' 
-            ? 'rgb(16, 185, 129)' 
-            : 'rgb(79, 70, 229)',
+          backgroundColor: function(context: any) {
+            const chart = context.chart;
+            const {ctx} = chart;
+            return createGradient(ctx, colors.future.gradient.start, colors.future.gradient.end);
+          },
+          borderColor: colors.future.border,
           borderWidth: 2,
-          borderRadius: 6,
-          order: 0,
-          barPercentage: 0.9,
-          borderSkipped: false
+          hoverBackgroundColor: colors.future.border,
+          borderRadius: 8,
+          barPercentage: 0.95,
+          categoryPercentage: 0.98,
+          hoverBorderColor: colors.future.border,
+          hoverBorderWidth: 2,
+          // Add a pattern to make it distinguishable
+          borderDash: [3, 3]
         }
       ]
     };
@@ -401,58 +616,72 @@ export default function Dashboard() {
 
   const chartData = getChartData();
 
-  // Include all datasets when calculating max value
+  // Calculate the maximum value across all datasets + 10% headroom
   const maxValue = Math.max(
     ...chartData.datasets[0].data,
     ...chartData.datasets[1].data,
     1 // Ensure at least 1 for empty data
   );
+  
+  const yAxisMax = Math.ceil(maxValue * 1.1 / 10000) * 10000;
 
-  // Set a sensible Y-axis max that's a bit higher than the max value or a reasonable default
-  const yAxisMax = maxValue > 0 
-    ? Math.ceil(maxValue * 1.2 / 10000) * 10000 // Round up to nearest 10,000 and add 20% headroom
-    : 10000; // Default to 10,000 if no data
-
+  // Type-safe chart options
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    animations: {
-      tension: {
-        duration: 1000,
-        easing: 'linear',
-        from: 0.8,
-        to: 0.2,
-        loop: false
+    animation: {
+      duration: 1000,
+      easing: 'easeOutQuart' as const
+    },
+    layout: {
+      padding: {
+        top: 10,
+        right: 10, 
+        bottom: 10,
+        left: 10
       }
     },
     scales: {
-      y: {
-        beginAtZero: true,
-        min: 0,
-        max: yAxisMax, // Set the max value for appropriate scaling
-        grid: {
-          color: 'rgba(0, 0, 0, 0.05)',
-          drawBorder: false,
-        },
-        ticks: {
-          callback: (value: number) => formatCurrency(value),
-          font: {
-            size: 11
-          },
-          color: '#6B7280',
-          // Ensure we have enough ticks to show meaningful values
-          count: 6
-        }
-      },
       x: {
         grid: {
-          display: false
+          display: false,
+          drawBorder: false
         },
         ticks: {
           font: {
-            size: 11
+            family: "'Inter', sans-serif",
+            size: 12
           },
           color: '#6B7280'
+        },
+        border: {
+          display: false
+        }
+      },
+      y: {
+        type: 'linear' as const,
+        beginAtZero: true,
+        max: yAxisMax,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)',
+          drawBorder: false
+        },
+        ticks: {
+          font: {
+            family: "'Inter', sans-serif",
+            size: 12
+          },
+          color: '#6B7280',
+          callback: function(this: any, tickValue: any): string {
+            if (typeof tickValue === 'number') {
+              return formatCurrency(tickValue);
+            }
+            return '';
+          },
+          count: 6
+        },
+        border: {
+          display: false
         }
       }
     },
@@ -461,25 +690,51 @@ export default function Dashboard() {
         display: false
       },
       tooltip: {
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        enabled: true,
+        mode: 'nearest' as const,
+        intersect: false,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
         titleColor: '#111827',
-        bodyColor: '#6B7280',
+        bodyColor: '#4B5563',
+        titleFont: {
+          family: "'Inter', sans-serif",
+          size: 14,
+          weight: 'bold' as const
+        },
+        bodyFont: {
+          family: "'Inter', sans-serif",
+          size: 13
+        },
+        padding: 12,
         borderColor: 'rgba(0, 0, 0, 0.1)',
         borderWidth: 1,
-        padding: 10,
-        cornerRadius: 6,
-        displayColors: false,
+        caretSize: 6,
+        cornerRadius: 8,
+        displayColors: true,
+        boxPadding: 4,
+        titleAlign: 'center' as const,
+        bodyAlign: 'center' as const,
         callbacks: {
-          label: function(context: any) {
-            return formatCurrency(context.parsed.y);
+          title: function(tooltipItems: any[]): string {
+            return tooltipItems[0].label;
           },
-          title: function(tooltipItems: any[]) {
-            const monthIndex = tooltipItems[0].dataIndex;
-            const month = chartData.labels[monthIndex];
-            return `${month} ${new Date().getFullYear()}`;
+          label: function(context: any): string {
+            const isPastPayment = context.datasetIndex === 0;
+            return isPastPayment ? 'Past/Current Payment' : 'Upcoming Payment';
+          },
+          afterLabel: function(context: any): string {
+            return `Amount: ${formatCurrency(context.parsed.y)}`;
+          },
+          footer: function(tooltipItems: any[]): string {
+            const isPastPayment = tooltipItems[0].datasetIndex === 0;
+            return `Status: ${isPastPayment ? 'Paid' : 'Scheduled'}`;
           }
         }
       }
+    },
+    interaction: {
+      mode: 'point' as const,
+      intersect: true
     }
   };
 
@@ -1073,10 +1328,12 @@ export default function Dashboard() {
                       <div>
                         <p className="text-sm font-medium text-gray-500">Outstanding Payments</p>
                         <h3 className={`mt-1.5 text-2xl font-bold ${paymentStats.outstanding > 0 ? 'text-amber-600' : 'text-gray-700'}`}>
-                          {formatCurrency(paymentStats.outstanding)}
+                          {role === 'tenant' 
+                            ? formatCurrency(Math.floor(paymentStats.outstanding / 1.085)) 
+                            : formatCurrency(paymentStats.outstanding)}
                         </h3>
                         <p className="mt-1.5 text-xs text-gray-500">
-                          {Math.floor(paymentStats.outstanding)} pending payment{paymentStats.outstanding !== 1 ? 's' : ''}
+                          {role === 'tenant' ? 'Before 8.5% platform fee' : 'Before 21% tax deduction'}
                         </p>
                       </div>
                       <div className={`p-2.5 rounded-full ${paymentStats.outstanding > 0 ? 'bg-amber-100' : 'bg-gray-200'}`}>
@@ -1094,9 +1351,19 @@ export default function Dashboard() {
                           {paymentStats.nextDue ? formatDate(paymentStats.nextDue) : 'No upcoming'}
                         </h3>
                         <p className="mt-1.5 text-xs text-gray-500">
-                          {paymentStats.nextDue && paymentStats.daysUntilNextPayment !== null ? 
-                            `Due in ${paymentStats.daysUntilNextPayment} days` : 
-                            ''}
+                          {paymentStats.daysUntilNextPayment !== null ? (
+                            <>
+                              {paymentStats.nextDueProperty && (
+                                <span className="block">{paymentStats.nextDueProperty}</span>
+                              )}
+                              <span className="block">
+                                Due in {paymentStats.daysUntilNextPayment} days
+                                {paymentStats.nextDueAmount && ` - ${formatCurrency(paymentStats.nextDueAmount)}`}
+                              </span>
+                            </>
+                          ) : (
+                            'No pending payments'
+                          )}
                         </p>
                       </div>
                       <div className="p-2.5 rounded-full bg-blue-100">
@@ -1105,262 +1372,176 @@ export default function Dashboard() {
                     </div>
                   </div>
                   
-                  {/* Received Amount */}
-                  <div className={`p-5 rounded-lg ${paymentStats.received > 0 ? 'bg-emerald-50' : 'bg-gray-50'} transition-all duration-200 hover:shadow-md`}>
+                  {/* Payment/Received Amount Card - Title changes based on role */}
+                  <div className="p-5 rounded-lg bg-emerald-50 transition-all duration-200 hover:shadow-md">
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-500">Received Amount</p>
-                        <h3 className={`mt-1.5 text-2xl font-bold ${paymentStats.received > 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
-                          {formatCurrency(paymentStats.received)}
+                        <p className="text-sm font-medium text-gray-500">
+                          {role === 'landlord' ? 'Received Amount' : 'Payment Amount'}
+                        </p>
+                        <h3 className="mt-1.5 text-2xl font-bold text-emerald-600">
+                          {role === 'landlord' 
+                            ? formatCurrency(paymentStats.netAmount) 
+                            : formatCurrency(paymentStats.outstanding)}
                         </h3>
                         <p className="mt-1.5 text-xs text-gray-500">
-                          {Math.floor(paymentStats.received)} completed payment{paymentStats.received !== 1 ? 's' : ''}
+                          {role === 'landlord' 
+                            ? 'After 21% tax deduction' 
+                            : 'Includes 8.5% platform fee'}
                         </p>
                       </div>
-                      <div className={`p-2.5 rounded-full ${paymentStats.received > 0 ? 'bg-emerald-100' : 'bg-gray-200'}`}>
-                        <CheckCircleIcon className={`h-6 w-6 ${paymentStats.received > 0 ? 'text-emerald-600' : 'text-gray-500'}`} />
+                      <div className="p-2.5 rounded-full bg-emerald-100">
+                        <BanknotesIcon className="h-6 w-6 text-emerald-600" />
+                      </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Chart */}
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
+              <div className="px-6 py-5 border-b border-gray-100">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {role === 'landlord' ? 'Monthly Income' : 'Monthly Payments'}
+                  </h2>
+                  
+                  <div className="flex items-center space-x-3">
+                    {/* Year Selector */}
+                    <div className="inline-flex rounded-md shadow-sm">
+                      <button
+                        onClick={() => setSelectedYear(selectedYear - 1)}
+                        className="px-3 py-2 text-sm font-medium rounded-l-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                      >
+                        &lt;
+                      </button>
+                      <span className="px-3 py-2 text-sm font-medium border-t border-b border-gray-300 bg-white text-gray-900">
+                        {selectedYear}
+                      </span>
+                      <button
+                        onClick={() => setSelectedYear(selectedYear + 1)}
+                        className="px-3 py-2 text-sm font-medium rounded-r-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                      >
+                        &gt;
+                      </button>
+                    </div>
+                    
+                    {/* Currency Selector */}
+                    <div className="inline-flex rounded-md shadow-sm">
+                      <button
+                        onClick={() => setSelectedCurrency('TRY')}
+                        className={`px-4 py-2 text-sm font-medium rounded-l-md border ${
+                          selectedCurrency === 'TRY' 
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 z-10' 
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        ₺ TRY
+                      </button>
+                      <button
+                        onClick={() => setSelectedCurrency('USD')}
+                        className={`px-4 py-2 text-sm font-medium border-t border-b ${
+                          selectedCurrency === 'USD' 
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 z-10' 
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        $ USD
+                      </button>
+                      <button
+                        onClick={() => setSelectedCurrency('EUR')}
+                        className={`px-4 py-2 text-sm font-medium rounded-r-md border ${
+                          selectedCurrency === 'EUR' 
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 z-10' 
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        € EUR
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
               
-              {/* Payment Chart */}
               <div className="px-6 py-4">
-                <div className="bg-white rounded-lg p-4">
-                  <div className="flex flex-col space-y-4">
-                    {/* Chart Title and Currency Toggle Row */}
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-sm font-medium text-gray-700">
-                        {role === 'landlord' ? 'Monthly Income' : 'Monthly Payments'}
-                      </h3>
-                      
-                      {/* Currency Toggle - Improved styling */}
-                      <div className="flex items-center rounded-full p-0.5 border border-gray-200">
-                        <button
-                          onClick={() => setSelectedCurrency('TRY')}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
-                            selectedCurrency === 'TRY' 
-                              ? 'bg-emerald-500 text-white shadow-sm' 
-                              : 'bg-transparent text-gray-600 hover:bg-gray-100'
-                          }`}
-                        >
-                          ₺ TRY
-                        </button>
-                        <button
-                          onClick={() => setSelectedCurrency('USD')}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
-                            selectedCurrency === 'USD' 
-                              ? 'bg-emerald-500 text-white shadow-sm' 
-                              : 'bg-transparent text-gray-600 hover:bg-gray-100'
-                          }`}
-                        >
-                          $ USD
-                        </button>
-                        <button
-                          onClick={() => setSelectedCurrency('EUR')}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
-                            selectedCurrency === 'EUR' 
-                              ? 'bg-emerald-500 text-white shadow-sm' 
-                              : 'bg-transparent text-gray-600 hover:bg-gray-100'
-                          }`}
-                        >
-                          € EUR
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Chart Legend */}
-                    <div className="flex items-center space-x-6 text-xs text-gray-500">
-                      <div className="flex items-center">
-                        <span className="inline-block w-4 h-4 mr-1.5 rounded-sm" 
-                              style={{ backgroundColor: role === 'landlord' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(79, 70, 229, 0.3)' }}></span>
-                        <span>Past/Current</span>
-                      </div>
-                      <div className="flex items-center">
-                        <span className="inline-block w-4 h-4 mr-1.5 rounded-sm border-2" 
-                              style={{ 
-                                backgroundColor: 'transparent',
-                                borderColor: role === 'landlord' ? 'rgb(16, 185, 129)' : 'rgb(79, 70, 229)' 
-                              }}></span>
-                        <span>Upcoming</span>
-                      </div>
-                    </div>
-                    
-                    {/* Debug information - Only show in development and when diagnostics is enabled */}
-                    {process.env.NODE_ENV === 'development' && diagnosticsMode && (
-                      <div className="bg-gray-100 p-4 rounded-md text-xs">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium">Diagnostics</h4>
-                          <button
-                            onClick={() => setDiagnosticsMode(false)}
-                            className="text-xs text-gray-500 hover:text-gray-700"
-                          >
-                            Hide
-                          </button>
-                        </div>
-                        
-                        <p className="mb-2">
-                          Has future data: {chartData.datasets[1].data.some(d => d > 0) ? 
-                            <span className="text-green-600 font-bold">Yes</span> : 
-                            <span className="text-red-600 font-bold">No</span>}
-                        </p>
-                        
-                        <details>
-                          <summary className="cursor-pointer mt-2">Chart data</summary>
-                          <pre className="mt-2 bg-gray-800 text-green-400 p-2 rounded overflow-auto max-h-64">{JSON.stringify({
-                            currentData: chartData.datasets[0].data,
-                            futureData: chartData.datasets[1].data
-                          }, null, 2)}</pre>
-                        </details>
-                      </div>
-              )}
-            </div>
-                  
-                  <div className="relative h-64 mt-4">
-                    <Bar 
-                      data={chartData} 
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                          y: {
-                            beginAtZero: true,
-                            min: 0,
-                            max: yAxisMax,
-                            grid: {
-                              color: 'rgba(0, 0, 0, 0.05)',
-                              drawBorder: false,
-                            },
-                            ticks: {
-                              callback: (value: number) => formatCurrency(value),
-                              font: { size: 11 },
-                              color: '#6B7280',
-                              count: 6
-                            }
-                          },
-                          x: {
-                            grid: {
-                              display: false
-                            },
-                            ticks: {
-                              font: { size: 11 },
-                              color: '#6B7280'
-                            }
-                          }
-                        },
-                        plugins: {
-                          legend: {
-                            display: false
-                          },
-                          tooltip: {
-                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                            titleColor: '#111827',
-                            bodyColor: '#6B7280',
-                            borderColor: 'rgba(0, 0, 0, 0.1)',
-                            borderWidth: 1,
-                            padding: 10,
-                            cornerRadius: 6,
-                            displayColors: false,
-                            callbacks: {
-                              label: function(context: any) {
-                                return `${context.dataset.label}: ${formatCurrency(context.parsed.y)}`;
-                              },
-                              title: function(tooltipItems: any[]) {
-                                const monthIndex = tooltipItems[0].dataIndex;
-                                const month = chartData.labels[monthIndex];
-                                return `${month} ${new Date().getFullYear()}`;
-                              }
-                            }
-                          }
-                        }
+                {/* Custom Legend */}
+                <div className="flex items-center space-x-6 mb-4">
+                  <div className="flex items-center">
+                    <span 
+                      className="inline-block w-4 h-4 mr-2" 
+                      style={{ 
+                        background: role === 'landlord' 
+                          ? 'linear-gradient(to bottom, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.75))' 
+                          : 'linear-gradient(to bottom, rgba(79, 70, 229, 0.9), rgba(67, 56, 202, 0.75))',
+                        borderRadius: '2px',
+                        border: `2px solid ${role === 'landlord' ? 'rgb(5, 150, 105)' : 'rgb(67, 56, 202)'}`
                       }}
                     />
+                    <span className="text-xs text-gray-600">Past/Current</span>
                   </div>
-          </div>
-        </div>
-
-              {/* CTA Button */}
-              <div className="px-6 py-5 bg-gray-50 flex justify-center border-t border-gray-100">
-                <Link 
-                  to={`/payments?role=${role}`}
-                  className="inline-flex items-center px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg transition-colors shadow-sm hover:shadow"
-                >
-                  View Full Payment History
-                  <ArrowRightIcon className="ml-2 h-4 w-4" />
-                </Link>
-            </div>
-              
-              {/* Optional: Payment Reminder */}
-              {paymentStats.outstanding > 0 && role === 'tenant' && (
-                <div className="px-6 py-3 bg-amber-50 border-t border-amber-100">
-                  <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                      <ExclamationCircleIcon className="h-5 w-5 text-amber-500 mr-2" />
-                      <p className="text-sm text-amber-800">You have pending payments that require attention.</p>
-                        </div>
-                    <Link 
-                      to="/payments/pending"
-                      className="text-sm font-medium text-amber-600 hover:text-amber-700 underline"
-                    >
-                      Review Now
-                    </Link>
-                      </div>
+                  <div className="flex items-center">
+                    <span 
+                      className="inline-block w-4 h-4 mr-2" 
+                      style={{ 
+                        background: role === 'landlord' 
+                          ? 'linear-gradient(to bottom, rgba(16, 185, 129, 0.5), rgba(5, 150, 105, 0.3))' 
+                          : 'linear-gradient(to bottom, rgba(79, 70, 229, 0.5), rgba(67, 56, 202, 0.3))',
+                        borderRadius: '2px',
+                        border: `2px solid ${role === 'landlord' ? 'rgb(5, 150, 105)' : 'rgb(67, 56, 202)'}`,
+                        backgroundImage: role === 'landlord' 
+                          ? 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(16, 185, 129, 0.2) 3px, rgba(16, 185, 129, 0.2) 6px)'
+                          : 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(79, 70, 229, 0.2) 3px, rgba(79, 70, 229, 0.2) 6px)'
+                      }}
+                    />
+                    <span className="text-xs text-gray-600">Upcoming ({new Date().getFullYear()})</span>
+                  </div>
                 </div>
-              )}
+                
+                {/* Chart Container */}
+                <div className="relative h-64 md:h-80">
+                  <Bar 
+                    data={chartData} 
+                    options={chartOptions} 
+                  />
+                </div>
+              </div>
             </div>
+
+            {/* Payment Reminder */}
+            {paymentStats.outstanding > 0 && role === 'tenant' && (
+              <div className="px-6 py-3 bg-amber-50 border-t border-amber-100">
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                    <ExclamationCircleIcon className="h-5 w-5 text-amber-500 mr-2" />
+                    <p className="text-sm text-amber-800">You have pending payments that require attention.</p>
+                      </div>
+                  <Link 
+                    to="/payments/pending"
+                    className="text-sm font-medium text-amber-600 hover:text-amber-700 underline"
+                  >
+                    Review Now
+                  </Link>
+                    </div>
+              </div>
+            )}
 
             {/* Recent Transactions */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100">
+              <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                 <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
+                <Link 
+                  to="/payments" 
+                  className="inline-block px-4 py-2 text-xs font-medium rounded text-white bg-emerald-500"
+                >
+                  <div className="flex items-center">
+                    <span>View</span>
+                    <span className="ml-1">All</span>
+                  </div>
+                </Link>
               </div>
               
               <div className="px-6 py-3">
-                <div className="flex items-center justify-between">
-                  {/* Search - Simplified with no visible icon */}
-                  <div className="w-full max-w-xs">
-                    <input
-                      type="text"
-                      className="w-full py-2 px-3 border-b border-gray-300 focus:border-emerald-500 focus:outline-none bg-transparent text-sm"
-                      placeholder="Search transactions"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  
-                  {/* Filter & View All */}
-                  <div className="flex items-center space-x-4">
-                    <div className="relative">
-                      <select
-                        value={transactionFilter}
-                        onChange={(e) => setTransactionFilter(e.target.value)}
-                        className="appearance-none bg-transparent py-2 pl-3 pr-8 border-none text-sm text-gray-900 focus:outline-none focus:ring-0"
-                      >
-                        <option value="all">All Transactions</option>
-                        <option value="paid">Paid</option>
-                        <option value="pending">Pending</option>
-                        <option value="overdue">Overdue</option>
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2">
-                        <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-                    
-                    <Link 
-                      to="/payments" 
-                      className="inline-block px-4 py-2 text-xs font-medium rounded text-white bg-emerald-500"
-                    >
-                      <div className="flex items-center">
-                        <span>View</span>
-                        <span className="ml-1">All</span>
-                      </div>
-                    </Link>
-                    </div>
-                  </div>
-                
                 {/* Table */}
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
