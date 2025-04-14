@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -29,8 +29,19 @@ import HowItWorks from './components/HowItWorks';
 import CookieConsent from './components/CookieConsent';
 import ReviewsPage from './pages/ReviewsPage';
 import PublicProfile from './pages/PublicProfile';
+import Support from './pages/Support';
+import { updateSunriseApartmentPaymentDay } from './data/updateLeaseData';
 
 export default function App() {
+  // Call the function to update Sunrise Apartment payment day
+  // This will run once when the app initializes
+  useEffect(() => {
+    // Fix the Sunrise Apartment payment day
+    updateSunriseApartmentPaymentDay()
+      .then(() => console.log('Sunrise Apartment payment day update attempt completed'))
+      .catch(error => console.error('Failed to update Sunrise Apartment payment day:', error));
+  }, []);
+
   return (
     <AuthProvider>
       <Router>
@@ -66,6 +77,11 @@ export default function App() {
               <Route path="/profile/reviews" element={<ReviewsPage />} />
               <Route path="/profile/reviews/:userId" element={<ReviewsPage />} />
               <Route path="/users/:userId" element={<ProtectedRoute><PublicProfile /></ProtectedRoute>} />
+              
+              {/* Support routes */}
+              <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
+              <Route path="/support/new" element={<ProtectedRoute><Support isNewTicket={true} /></ProtectedRoute>} />
+              <Route path="/support/:id" element={<ProtectedRoute><Support /></ProtectedRoute>} />
               
               {/* Catch all route - redirect to home */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
