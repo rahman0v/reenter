@@ -161,8 +161,8 @@ export default function Footer() {
               >
                 <h3 className="text-sm font-semibold leading-6 text-gray-900 uppercase tracking-wider">Contact Us</h3>
                 <div className="mt-6 space-y-5">
-                  <p className="text-sm leading-6 text-gray-600">+1 (555) 123-4567</p>
-                  <p className="text-sm leading-6 text-gray-600">support@reenter.com</p>
+                  <p className="text-sm leading-6 text-gray-600">+90 (530) 632-6998</p>
+                  <p className="text-sm leading-6 text-gray-600">rahmanov@reenter-tr.com</p>
                   <p className="text-sm leading-6 text-gray-600">123 Rental St, Suite 456<br />San Francisco, CA 94107</p>
                 </div>
               </motion.div>

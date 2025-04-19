@@ -157,7 +157,22 @@ const LeaseDetail = () => {
         // First fetch just the lease for faster display
         const leaseData = await leaseService.getLeaseById(leaseId);
         console.log('Lease data received:', leaseData);
-        setLease(leaseData);
+        
+        // Ensure template_data exists and has all required properties
+        const normalizedLeaseData = {
+          ...leaseData,
+          template_data: {
+            utilities_included: [],
+            pets_allowed: false,
+            smoking_allowed: false,
+            notice_period_days: 30,
+            additional_terms: '',
+            ...(leaseData.template_data || {})
+          }
+        };
+        
+        console.log('Normalized lease data:', normalizedLeaseData);
+        setLease(normalizedLeaseData);
         
         // After setting the lease, fetch the events and requests
         try {
@@ -880,7 +895,7 @@ const LeaseDetail = () => {
           </div>
 
           {/* 5. UTILITIES section - if applicable */}
-          {lease.template_data && lease.template_data.utilities_included && lease.template_data.utilities_included.length > 0 && (
+          {lease.template_data && (
             <>
               <div className="px-4 py-5 sm:px-6 border-t border-b border-gray-200 bg-gray-50">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">5. UTILITIES</h3>
@@ -889,18 +904,22 @@ const LeaseDetail = () => {
                 <div className="grid grid-cols-6 gap-y-6">
                   <div className="text-sm font-medium text-right text-gray-500 pr-4 col-span-2">Utilities Included in Rent:</div>
                   <div className="text-sm text-gray-900 col-span-4">
-                    <div className="flex flex-wrap gap-2">
-                      {lease.template_data.utilities_included.map((utility: string) => (
-                        <span 
-                          key={utility} 
-                          className="inline-block bg-gray-100 text-gray-800 text-xs px-2.5 py-0.5 rounded"
-                        >
-                          {utility}
-                        </span>
-                      ))}
-                    </div>
+                    {lease.template_data.utilities_included && lease.template_data.utilities_included.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {lease.template_data.utilities_included.map((utility: string) => (
+                          <span 
+                            key={utility} 
+                            className="inline-block bg-gray-100 text-gray-800 text-xs px-2.5 py-0.5 rounded"
+                          >
+                            {utility}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-gray-500">No utilities included in rent</span>
+                    )}
                     <p className="mt-3 text-xs text-gray-500">
-                      All other utilities shall be the responsibility of the Tenant.
+                      All utilities not explicitly included shall be the responsibility of the Tenant.
                     </p>
                   </div>
                 </div>
@@ -930,8 +949,8 @@ const LeaseDetail = () => {
             </>
           )}
 
-          {/* 7. ADDITIONAL TERMS section - if applicable */}
-          {lease.template_data && lease.template_data.additional_terms && (
+          {/* 7. ADDITIONAL TERMS section */}
+          {lease.template_data && (
             <>
               <div className="px-4 py-5 sm:px-6 border-t border-b border-gray-200 bg-gray-50">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">7. ADDITIONAL TERMS</h3>
@@ -940,7 +959,10 @@ const LeaseDetail = () => {
                 <div className="grid grid-cols-6 gap-y-6">
                   <div className="text-sm font-medium text-right text-gray-500 pr-4 col-span-2 self-start">Additional Terms & Conditions:</div>
                   <div className="text-sm text-gray-900 col-span-4 whitespace-pre-wrap">
-                    {lease.template_data.additional_terms}
+                    {lease.template_data.additional_terms ? 
+                      lease.template_data.additional_terms : 
+                      <span className="text-gray-500">No additional terms specified</span>
+                    }
                   </div>
                 </div>
               </div>

@@ -79,6 +79,7 @@ export interface LeaseData {
   start_date: string;
   end_date: string;
   premium?: number;
+  payment_day?: number;
   template_data: {
     additional_terms?: string;
     utilities_included?: string[];
@@ -441,7 +442,14 @@ export const leaseService = {
   createLease: async (leaseData: LeaseData): Promise<Lease> => {
     console.log('API: Creating lease with data:', leaseData);
     try {
-      const response = await api.post<Lease>('/leases', leaseData);
+      // Ensure payment_day is always set, defaulting to 10th if not provided
+      const leaseDataWithPaymentDay = {
+        ...leaseData,
+        payment_day: leaseData.payment_day || 10
+      };
+      
+      console.log('API: Creating lease with payment_day:', leaseDataWithPaymentDay.payment_day);
+      const response = await api.post<Lease>('/leases', leaseDataWithPaymentDay);
       return response.data;
     } catch (error: any) {
       console.error('API Error:', error.response?.data || error);
@@ -455,8 +463,19 @@ export const leaseService = {
   },
 
   getAllLeases: async (): Promise<Lease[]> => {
-    const response = await api.get<Lease[]>('/leases');
-    return response.data;
+    try {
+      const response = await api.get<Lease[]>('/leases');
+      
+      // Debug lease payment_day fields
+      response.data.forEach(lease => {
+        console.log(`Lease API data: ${lease.id} - ${lease.property_name}, payment_day = ${lease.payment_day || 'not set - this should be explicitly defined'}`);
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching leases:', error);
+      throw error;
+    }
   },
 
   getLeaseById: async (id: number): Promise<Lease> => {
@@ -467,7 +486,14 @@ export const leaseService = {
   updateLease: async (id: number, leaseData: LeaseData): Promise<Lease> => {
     console.log('API: Updating lease with data:', leaseData);
     try {
-      const response = await api.put<Lease>(`/leases/${id}`, leaseData);
+      // Ensure payment_day is always set, defaulting to 10th if not provided
+      const leaseDataWithPaymentDay = {
+        ...leaseData,
+        payment_day: leaseData.payment_day || 10
+      };
+      
+      console.log('API: Updating lease with payment_day:', leaseDataWithPaymentDay.payment_day);
+      const response = await api.put<Lease>(`/leases/${id}`, leaseDataWithPaymentDay);
       return response.data;
     } catch (error: any) {
       console.error('API Error:', error.response?.data || error);

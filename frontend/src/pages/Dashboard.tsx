@@ -584,7 +584,7 @@ export default function Dashboard() {
           },
           borderColor: colors.past.border,
           borderWidth: 2,
-          borderRadius: 8,
+          borderRadius: 4,
           hoverBackgroundColor: colors.past.border,
           barPercentage: 0.95,
           categoryPercentage: 0.98,
@@ -602,7 +602,7 @@ export default function Dashboard() {
           borderColor: colors.future.border,
           borderWidth: 2,
           hoverBackgroundColor: colors.future.border,
-          borderRadius: 8,
+          borderRadius: 4,
           barPercentage: 0.95,
           categoryPercentage: 0.98,
           hoverBorderColor: colors.future.border,
@@ -813,8 +813,8 @@ export default function Dashboard() {
 
         {/* Main Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Left Sidebar */}
-          <div className="lg:col-span-3 space-y-8">
+          {/* Left Sidebar - Order changed for mobile view */}
+          <div className="lg:col-span-3 space-y-8 order-2 lg:order-1">
             {/* Active Leases Section */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <div className="px-4 py-5 sm:px-6 border-b border-gray-100">
@@ -1073,8 +1073,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-          {/* Main Content */}
-          <div className="lg:col-span-9 space-y-8">
+          {/* Main Content Area - Order changed for mobile view */}
+          <div className="lg:col-span-9 space-y-8 order-1 lg:order-2">
             {/* Profile KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Profile Status Card */}

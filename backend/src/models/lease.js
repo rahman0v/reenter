@@ -69,10 +69,16 @@ class Lease {
 
   static async findById(id) {
     try {
-      const result = await safeQuery(
-        'SELECT * FROM leases WHERE id = $1',
-        [id]
-      );
+      const query = `
+        SELECT l.*, 
+               u1.name as landlord_name,
+               COALESCE(u2.name, 'No tenant assigned') as tenant_name
+        FROM leases l
+        JOIN users u1 ON l.landlord_id = u1.id
+        LEFT JOIN users u2 ON l.tenant_id = u2.id
+        WHERE l.id = $1
+      `;
+      const result = await safeQuery(query, [id]);
       return result.rows[0];
     } catch (error) {
       console.error('Error finding lease by ID:', error);

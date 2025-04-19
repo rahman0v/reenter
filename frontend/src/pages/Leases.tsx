@@ -351,6 +351,9 @@ const LeaseCard = ({ lease, userRole }: LeaseCardProps) => {
             <p className="text-sm text-gray-500">
               {lease.property_address.slice(0, 30) + (lease.property_address.length > 30 ? '...' : '')}
             </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Reference: <span className="font-medium">{lease.ref_code}</span>
+            </p>
           </div>
           <StatusBadge status={lease.status} />
         </div>
